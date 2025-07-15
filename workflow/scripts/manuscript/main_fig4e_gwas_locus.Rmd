@@ -1,0 +1,196 @@
+---
+title: "Fig4e GWAS locus example"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+
+# increase timeout limit for file downloads
+options(timeout = 240)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Make genome browser style plot of the CPEB4 GWAS locus in mutliple cell types, including ENCODE-rE2G
+predictions.
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages and functions
+library(Gviz)
+library(GenomicInteractions)
+library(GenomicRanges)
+library(rtracklayer)
+library(tidyverse)
+```
+
+***
+
+## Load and prepare data
+Load and prepare any genome-wide data and define input files for data that will be loaded and
+processed for the selected locus.
+```{r locus}
+# locus coordinates and gene for which plot is made
+locus <- GRanges(seqnames = "chr5", ranges = IRanges(start = 173769884, end = 174058269),
+                 name = "CPEB4")
+```
+
+```{r genomeAnnot}
+# import gtf file containing genome annotations
+annot <- import(snakemake@input$genome_annot, format = "gtf")
+
+# extract annotations on protein-coding genes exons
+genes <- annot[annot$type == "exon" & annot$gene_type == "protein_coding" & 
+                 annot$transcript_type == "protein_coding"]
+
+# create data frame containing required gene annotation data
+genes <- genes %>% 
+  as.data.frame() %>%
+  select(chromosome = seqnames, start, end, width, strand, feature = gene_type, gene = gene_id,
+         exon = exon_id, transcript = transcript_id, symbol = gene_name)
+
+# make genes track
+genes_track <- GeneRegionTrack(genes, genome = "hg38", name = "Genes",
+                               transcriptAnnotation = "symbol",
+                               collapseTranscripts = "meta",
+                               col = "#676767", fill = "#676767")
+
+# make genome coordinates track
+axis_track <- GenomeAxisTrack()
+```
+
+```{r dataLoadFunctions}
+# function to load E-G predictions in .bedpe format and create an interaction track
+make_e2g_track <- function(file, name, color = "gray", gene = NULL, scale_score = FALSE,
+                           remove_promoters = TRUE, plot.outside = TRUE) {
+  
+  # load e2g file
+  e2g <- import(file, format = "bedpe")
+  
+  # remove self-promoters if specified
+  if (remove_promoters == TRUE) {
+    enhancers <- GenomicAlignments::first(e2g)
+    promoters <- GenomicAlignments::second(e2g)
+    self_promoters <- width(pintersect(enhancers, promoters)) > 0
+    e2g <- e2g[!self_promoters]
+  }
+
+  # create GenomicInteractions object
+  genes <- sub("\\|.+", "", mcols(e2g)[["name"]])
+  e2g_int <- GenomicInteractions(anchor1 = S4Vectors::first(e2g),
+                                 anchor2 = S4Vectors::second(e2g),
+                                 counts = mcols(e2g)[["score"]],
+                                 gene = genes)
+  
+  # only extract interactions of a specific gene (or multiple genes)
+  if (!is.null(gene)) {
+    e2g_int <- e2g_int[e2g_int$gene %in% gene]
+  }
+  
+  # set counts to 1 if scaling is disabled
+  if (scale_score == FALSE) {
+    e2g_int$counts <- 1    
+  }
+  
+  # create interaction track to show
+  e2g_track <- InteractionTrack(e2g_int, name = name)
+  
+  # set other display parameters
+  displayPars(e2g_track) <- list(col.interactions = color, col.anchors.line = color,
+                                 col.anchors.fill = color, plot.outside = plot.outside, 
+                                 col.outside = color)
+  
+  return(e2g_track)
+  
+}
+```
+
+```{r e2gData}
+# load ENCODE-rE2G metadata with paths to all prediction files
+e2g_meta <- read_tsv(snakemake@input$e2g_metadata, show_col_types = FALSE)
+
+# get .bedpe files with thresholded ENCODE-rE2G predictions and .bigWig files with DNase-seq signal
+# to show in locus plot
+e2g_samples <- c("K562_ENCSR000EOT", "hematopoietic_multipotent_progenitor_cell_ENCSR845CFB",
+                 "activated_T-cell_ENCSR466SUZ", "B_cell_ENCSR891VOV",
+                 "common_myeloid_progenitor__CD34-positive_ENCSR122VUW",
+                 "mesenteric_fat_pad_ENCSR197BFD")
+e2g_meta_samples <- filter(e2g_meta, Sample %in% e2g_samples)
+e2g_bedpe <- deframe(select(e2g_meta_samples, `Biosample term name`, thresholded_bedpe_path))
+dnase_bigwig <- deframe(select(e2g_meta_samples, `Biosample term name`, dnase_bigwig_url))
+```
+
+```{r makeE2Gtracks}
+# create interaction tracks for all ENCODE-rE2G samples to show
+e2g_genes <- c("CPEB4", "C5orf47", "NSG2")
+e2g_tracks <- mapply(FUN = make_e2g_track, file = e2g_bedpe, name = names(e2g_bedpe),
+                     MoreArgs = list(gene = e2g_genes))
+```
+
+```{r makeDNaseTracks}
+# function to download bigwig file as temporary file
+download_bigwig <- function(file, dir = tempdir()) {
+  downloaded_file <- file.path(dir, basename(file))
+  download.file(url = file, destfile = downloaded_file)
+}
+
+# download all DNase-seq bigWig files
+#invisible(lapply(dnase_bigwig, FUN = download_bigwig))
+
+# create DataTracks for DNase-seq signals
+local_files <- file.path("/scratch/users/agschwin/bigwigs", basename(dnase_bigwig))
+names(local_files) <- names(dnase_bigwig)
+dnase_tracks <- lapply(local_files, FUN = DataTrack, genome = "hg38", type = "polygon",
+                       name = "DNase-seq", fill.mountain = rep("steelblue", 2),
+                       col.mountain = "steelblue")
+```
+
+```{r makeLocusPlot, fig.height=6, fig.width=9}
+# create list of e2g and DNase tracks
+cell_type_order <- c("hematopoietic multipotent progenitor cell", "K562", "activated T-cell", 
+                     "B cell", "common myeloid progenitor, CD34-positive", "mesenteric fat pad")
+pred_tracks <- unlist(Map(list, e2g_tracks[cell_type_order], dnase_tracks[cell_type_order]))
+
+# highlight GWAS variant
+variant_coord <- 173860848
+width <- 3000
+pred_tracks <- HighlightTrack(trackList = pred_tracks,
+               start = variant_coord - width / 2, width = width,
+               chromosome = as.character(seqnames(locus)), fill = "#E6E6E6", col = NA)
+
+# combine with genes and axis tracks and set track heights
+all_tracks <- c(list(axis_track, genes_track), pred_tracks)
+track_sizes <- c(1, 0.5, rep(1, length(pred_tracks)))
+
+# make locus plot
+plotTracks(trackList = c(all_tracks), sizes = track_sizes,
+           chromosome = as.character(seqnames(locus)), from = start(locus), to = end(locus),
+           background.title = "transparent", col.axis = "black", fontcolor.title = "black",
+           fontface.title = 1, rotation.title = 0, cex.axis = 0.6, cex.title = 0.6, margin = 20)
+```
+
+```{r}
+# save plot to .pdf file
+pdf("results/manuscript/plots/main_fig4e_gwas_locus.pdf", height = 6, width = 9)
+plotTracks(trackList = c(all_tracks), sizes = track_sizes,
+           chromosome = as.character(seqnames(locus)), from = start(locus), to = end(locus),
+           background.title = "transparent", col.axis = "black", fontcolor.title = "black",
+           fontface.title = 1, rotation.title = 0, cex.axis = 0.6, cex.title = 0.6, margin = 20)
+dev.off()
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

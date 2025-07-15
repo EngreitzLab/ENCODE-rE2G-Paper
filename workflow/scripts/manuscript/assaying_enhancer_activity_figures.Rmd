@@ -1,0 +1,265 @@
+---
+title: "Enhancer activity main and supplementary figures"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Create figures and tables for enhancer activity assay analyses for ENCODE distal regulation
+manuscript.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(ggExtra)
+library(ggrepel)
+library(cowplot)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+## Used data
+The merged output file from the CRISPR comparison pipeline is used for enhancer activity models
+using bigWig files for 513 ENCODE chromatin assay experiments to compute activity.
+```{r prepareInput}
+# load enhancer activity assay metadata and fitler for K562
+metadata_bigwig <- fread(snakemake@input$metadata_bigwig)
+metadata_bigwig <- filter(metadata_bigwig, `Biosample term name` == "K562")
+
+# load merged data from CRISPR benchmarking pipeline
+merged <- fread(snakemake@input$merged_data, showProgress = FALSE)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE)
+
+# remove any ABC versions from this analysis
+pred_config <- pred_config %>% 
+  filter(!(pred_id == "ABCfull" & pred_col == "ABC.Score") & !(pred_id == "ABCdnase" & pred_col == "ABC.Score")) %>% 
+  filter(pred_id != "EnhActAssayDHS")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged <- processMergedData(merged, pred_config = pred_config,
+                            filter_valid_connections = TRUE, include_missing_predictions = TRUE,
+                            distToTSS_as_kb = TRUE)
+```
+
+## Calculate performance
+Overall performance of models using different enhancer activity assays is measured using area under
+the precision-recall curve (AUPRC).
+```{r computePerformance}
+# compute precision-recall table
+pr <- calcPRCurves(merged, pred_config = pred_config, pos_col = "Regulated")
+
+# compute performance summary
+perf <-  makePRSummaryTable(pr, pred_config = pred_config, min_sensitivity = 0.7)
+```
+
+```{r performanceEnhActModels}
+# get file ids for enhancer activity models
+enh_act_models <- perf %>% 
+  filter(pred_id == "EnhActAssayOnly") %>% 
+  select(pred_uid, pred_name_long) %>% 
+  mutate(file_id = sub(".* \\((.+)\\)", "\\1", pred_name_long)) %>% 
+  select(-pred_name_long)
+
+# add type based on assay for each model
+enh_act_models <- metadata_bigwig %>% 
+  select(file_id = `File accession`, Type = Assay) %>% 
+  left_join(enh_act_models, ., by = "file_id")
+
+# add other predictive models and manually set assay for those
+model_types <- perf %>% 
+  select(pred_uid) %>% 
+  left_join(enh_act_models, by = "pred_uid") %>% 
+  mutate(Type = case_when(
+    grepl(pred_uid, pattern = "^baseline") ~ "Baseline",
+    grepl(pred_uid, pattern = "contact") ~ "Contact frequency",
+    is.na(Type) ~ "Other",
+    TRUE ~ Type
+  ))
+
+# add model types to performance summary
+perf <- left_join(perf, model_types, by = "pred_uid")
+```
+
+```{r perfTop10Models}
+# get performance of all assays (no predictive models) and rank by AUPRC (top to bottom)
+perf_enh_act_bigwig_assays <- perf %>% 
+  filter(Type != "Other") %>%
+  arrange(desc(AUPRC)) %>% 
+  mutate(rank = row_number()) %>% 
+  mutate(pred_name_long = fct_reorder(pred_name_long, AUPRC, .desc = TRUE))
+
+# extract performance for top 10 enhancer assay models and force add H3K27ac
+perf_top_assays <- perf_enh_act_bigwig_assays %>% 
+  filter(rank %in% 1:10 | grepl("H3K27ac", pred_name_long))
+  
+# get merged data for top assays
+merged_top_assays <- filter(merged, pred_uid %in% perf_top_assays$pred_uid)
+
+# compute bootstrapped performance for top10 models
+merged_top_assays_bs <- convertMergedForBootstrap(merged_top_assays, pred_config = pred_config)
+bs_perf_top_assays <- bootstrapPerformanceIntervals(merged_top_assays_bs, metric = "auprc",
+                                                      R = 1000)
+
+# add long predictor names and rank 
+bs_perf_top_assays <- perf_enh_act_bigwig_assays %>% 
+  select(pred_uid, pred_name_long, rank, Type) %>% 
+  left_join(bs_perf_top_assays, ., by = c("id" = "pred_uid"))
+```
+
+## Panel for main figure 5
+Create panel for main figure showing distribution of model performance and highlighting top 10
+performing enhancer activity assays.
+```{r mainFigPlots, fig.height=3.5, fig.width=5.5}
+# set colors for the different model types
+type_colors <- c("TF ChIP-seq" = "steelblue", "DNase-seq" = "darkgoldenrod3",
+                 "ATAC-seq" = "darkorange2", "Histone ChIP-seq" = "firebrick3",
+                 "Other" = "black", "Baseline" = "gray55", "Contact frequency" = "darkorchid")
+
+# get auprc of distance to TSS
+perf_dist <- pull(filter(perf, pred_uid == "baseline.distToTSS"), AUPRC)
+
+# create condensed waterfall plot of performance of all models
+p1 <- ggplot(perf_enh_act_bigwig_assays, aes(x = rank, y = AUPRC)) +
+  geom_point(size = 1) +
+  geom_hline(yintercept = perf_dist) +
+  geom_rect(aes(xmin = -10, xmax = 18, ymin = 0.5, ymax = 0.65), fill = "transparent",
+            color = "darkgray", linewidth = 0.25) +
+  labs(x = "Models ranked by AUPRC", title = "All models") +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+# manually rename some top assay models
+# bs_perf_top_assays <- bs_perf_top_assays %>%
+#   mutate(pred_name_long = case_when(
+#     pred_name_long == "NCOR1 (ENCFF935VYF)" ~ "NCOR1 (1)",
+#     pred_name_long == "NCOR1 (ENCFF241YVJ)" ~ "NCOR1 (2)",
+#     TRUE ~ as.character(pred_name_long)
+#   ))
+
+# create pretty names for top models including assay name and performance rank
+bs_perf_top_assays <- bs_perf_top_assays %>%
+  mutate(pred_name_long = sub(" \\(ENCFF.+", "", pred_name_long)) %>% 
+  mutate(pred_name_long = paste0(pred_name_long, " (", rank, ".)"))
+
+# only plot top assay models
+p2 <- ggplot(bs_perf_top_assays, aes(y = fct_reorder(pred_name_long, .x = full), x = full, fill = Type)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  geom_vline(xintercept = perf_dist) + 
+  labs(title = "Top models", x = "AUPRC") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = type_colors) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), axis.text.y = element_text(size = 7),
+        legend.position = "none")
+
+# arrange plots into panel
+plot_grid(p1, p2, nrow = 1, rel_widths = c(0.75, 1))
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/main_fig5f_enh_activity.pdf", height = 3.5, width = 5.5)
+
+# save top 10 assay performance to file for use in other analyses
+write_csv(bs_perf_top_assays, file = "results/manuscript/tables/enh_activity_top_assays.csv")
+```
+
+## Figure for supplementary note
+Create figure showing the performance of all models and highlight all histone modification models.
+```{r perfHistModModels}
+# rank all predictors including predictive models by AUPRC (top to bottom)
+perf_enh_act_bigwig <- perf %>% 
+  arrange(desc(AUPRC)) %>% 
+  mutate(rank = row_number()) %>% 
+  mutate(pred_name_long = fct_reorder(pred_name_long, AUPRC, .desc = TRUE))
+
+# extract performance and merged data for histone modification models
+perf_hist <- filter(perf_enh_act_bigwig, Type %in% c("Baseline", "Histone ChIP-seq"))
+merged_hist <- filter(merged, pred_uid %in% perf_hist$pred_uid)
+
+# compute bootstrapped performance for histone modification models
+bs_perf_hist_bs <- convertMergedForBootstrap(merged_hist, pred_config = pred_config)
+bs_perf_hist <- bootstrapPerformanceIntervals(bs_perf_hist_bs, metric = "auprc", R = 1000)
+
+# add pretty predictor names
+bs_perf_hist <- perf_enh_act_bigwig %>% 
+  select(pred_uid, pred_name_long, Type) %>% 
+  left_join(bs_perf_hist, ., by = c("id" = "pred_uid"))
+```
+
+```{r suppFigPlots}
+# rename ABC model to an easier to read name
+perf_supp_plot <- perf_enh_act_bigwig %>% 
+  mutate(pred_name_long = as.character(pred_name_long))
+
+# get median and 5th and 95th percentile (90% range) of AUPRC distribution
+median_auprc <- median(perf_enh_act_bigwig$AUPRC)
+quant_auprc <- quantile(perf_enh_act_bigwig$AUPRC, probs = c(0.05, 0.95))
+
+# plot AUPRC performance of all predictors
+p1 <- ggplot(perf_enh_act_bigwig, aes(x = rank, y = AUPRC, color = Type)) +
+  geom_point(data = filter(perf_enh_act_bigwig, Type == "TF ChIP-seq")) +
+  geom_point(data = filter(perf_enh_act_bigwig, Type != "TF ChIP-seq")) +
+  geom_text_repel(data = filter(perf_enh_act_bigwig, Type == "Other"), aes(label = pred_name_long),
+                  box.padding = 2, show.legend = FALSE) +
+  geom_hline(yintercept = median_auprc, color = "firebrick") + 
+  geom_hline(yintercept = quant_auprc, linetype = "dashed") +
+  labs(x = "Models ranked by AUPRC", title = "All models") +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_color_manual(values = type_colors) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "bottom")
+
+# add marginal histogram
+p1 <- ggMarginal(p1, type = "histogram",  margins = "y", yparams = list(bins = 50, fill = "gray42"))
+
+# plot histone modification models
+p2 <- ggplot(bs_perf_hist, aes(y = fct_reorder(pred_name_long, .x = full), x = full, fill = Type)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  labs(title = "Histone modifications", x = "AUPRC") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = type_colors) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), axis.text.y = element_text(size = 7),
+        legend.position = "none")
+```
+
+```{r arrangeSuppFig,fig.height=4, fig.width=9}
+# arrange plots into one figure
+plot_grid(p1, p2, rel_widths = c(1, 0.7), scale = c(1, 0.8), labels = c("a", "b"))
+
+# save plot to .pdf for manuscript
+ggsave(filename = "results/manuscript/plots/figS11_enhancer_activity.pdf", height = 4, width = 9)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

@@ -1,0 +1,354 @@
+---
+title: "Plot proportion of indirect effects in CRISPR data"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Calculate indirect effects positive ratio and compare to cis-effect positive ratio as a function of
+distance to TSS for Gasperini2019. Based on these results, filter out any pairs beyond the distance
+where cis and indirect effects occur at the same probability.
+
+```{r requiredPackages, warning=FALSE, message=FALSE}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+## Estimated proportion of indirect effects
+Results from differential expression tests for trans-acting effects are used to estimate the
+proportion of indirect effects in CRISPR data. Proportion of indirect effects is compared to
+proportion of direct cis effects from main differential expression results.
+```{r}
+# load trans and main cis effect results
+trans_results <- read_tsv(snakemake@input$trans_results, show_col_types = FALSE)
+cis_results <- read_tsv(snakemake@input$cis_results, show_col_types = FALSE)
+
+# load distal regulation gene universe file
+gene_univ <- read_tsv(snakemake@input$gene_universe, show_col_types = FALSE)
+```
+
+### Filter data
+Filter trans and cis effects based on ValidConnection in ENCODE format data. For trans effects, any
+perturbations that are TSS controls or overlap potential promoters are removed. For cis effects,
+the same filter is applied in addition to removing any E-G pairs where the perturbation is within
+the gene body of their target genes. These filters consistent with all other ENCODE distal
+regulation analyses.
+```{r}
+# load processed ENCODE format results including filters
+encode_results <- read_tsv(snakemake@input$encode_results, show_col_types = FALSE)
+
+# get gene symbol for every gene id from processed ENCODE data
+genes <- encode_results %>%
+  select(gene = measuredEnsemblID, gene_symbol = measuredGeneSymbol) %>% 
+  distinct()
+
+# add gene symbols to cis results 
+cis_results <- left_join(cis_results, genes, by = "gene")
+
+# add ValidConnection column to cis results
+cis_results <- cis_results %>% 
+  mutate(name = paste0(gene_symbol, "|", pert_chr, ":", pert_start, "-", pert_end, ":.")) %>% 
+  left_join(distinct(select(encode_results, name, ValidConnection)), by = "name")
+```
+
+```{r}
+# get valid enhancers only
+enh_filter <- c("overlaps potential promoter", "TSS targeting guide(s)")
+valid_enh <- encode_results %>% 
+  filter(!ValidConnection %in% enh_filter) %>% 
+  pull(PerturbationTargetID)
+
+# add ValidConnection column to trans-results
+trans_results <- trans_results %>% 
+  mutate(pert_id = paste0(pert_chr, ":", pert_start, "-", pert_end, ":.")) %>% 
+  mutate(ValidConnection = if_else(pert_id %in% valid_enh, true = "TRUE", false = "Invalid enhancer"))
+```
+
+```{r}
+# filter cis and trans results based on ValidConnection
+cis_results_filt <- filter(cis_results, ValidConnection == "TRUE")
+trans_results_filt <- filter(trans_results, ValidConnection == "TRUE")
+
+# only retain data on genes in distal regulation genes universe
+cis_results_filt <- filter(cis_results_filt, gene %in% gene_univ$Ensembl_ID)
+trans_results_filt <- filter(trans_results_filt, gene %in% gene_univ$Ensembl_ID)
+```
+
+### Calculate positive ratios
+Calculate proportion of positives for both trans effects and cis effects. For the latter, the
+proportion of positives is calculates as a function of distance to TSS.
+
+Bin cis results into 50 bins based on distance to TSS and compute proportion of positives for each
+bin:
+```{r}
+# add significance and regulated columns to cis results
+cis_results_filt <- cis_results_filt %>% 
+  mutate(significant = pval_adj < 0.05,
+         regulated = significant & logFC < 0) %>% 
+  filter(!is.na(regulated))
+
+# bin cis pairs by distance
+cis_results_filt <- cis_results_filt %>% 
+  mutate(abs_dist = abs(dist_to_tss),
+         dist_bin = cut(abs_dist, breaks = 50))
+
+# calculate positive ratios and mean distance per distance bin
+cis_pos_ratio <- cis_results_filt %>% 
+  group_by(dist_bin) %>% 
+  summarize(positive_ratio = mean(regulated),
+            mean_dist = mean(abs_dist)) %>% 
+  mutate(Type = "Cis-interactions")
+```
+
+Calculate proportion of positives for trans effects regardless of distance (all are on other
+chromosomes than the perturbation).
+```{r}
+# calculate trans-effects positive ratio
+trans_pos_ratio <- mean(trans_results_filt$regulated, na.rm = TRUE)
+
+# create mock table
+trans_pos_ratio_tbl <- tibble(mean_dist = c(0, 2e6),
+       positive_ratio = trans_pos_ratio,
+       Type = "Trans-interactions")
+```
+
+### Plot cis vs trans positive ratios
+Plot the proportion of positives for cis effects as a function of distance to TSS. Add a horizontal
+line to indicate the expected proportion of indirect effects estimated from testing for trans
+effects. The red line indicates where the proportion of cis effects starts to be equal to the
+expected proportion of indirect effects. 
+```{r, fig.height=3.5, fig.width=6}
+# manually inferred distance to TSS threshold where proportion of indirect effects is same as
+# proportion of effects in cis
+dist_threshold_kb <- 250
+
+# plot proportion of positives as function of distance
+p1 <- ggplot(cis_pos_ratio, aes(x = mean_dist / 1000, y = positive_ratio, color = Type)) +
+  geom_point() +
+  geom_line(data = trans_pos_ratio_tbl) +
+  geom_vline(xintercept = dist_threshold_kb, color = "firebrick") +
+  labs(x = "Distance to TSS (Kb, 0-2 Mb, 50 bins)", y = "Proportion positives",
+       title = "Gasperini2019 cis vs. trans positive ratio", color = "Interaction\ntype") +
+  scale_color_manual(values = c("black", "dodgerblue3")) +
+  theme_classic() +
+  theme(text = element_text(size = 13))
+```
+
+```{r}
+# function to calculate hit ratios within a given distance to tss range
+calc_hit_ratios_dist <- function(cis_results, trans_pos_ratio, min_dist, max_dist) {
+  
+  # get total number of cis-hits below max distance
+  cis_results <- filter(cis_results, abs_dist <= max_dist)
+  total_cis_hits <- sum(cis_results$regulated)
+  
+  # calculate proportions of hits above min distance
+  cis_results %>% 
+    filter(abs_dist > min_dist) %>% 
+    summarize(far_cis_hits = sum(regulated),
+              far_cis_pos_ratio = mean(regulated)) %>% 
+    mutate(trans_pos_ratio = trans_pos_ratio,
+           far_cis_vs_trans_ratio = far_cis_pos_ratio / trans_pos_ratio,
+           expect_true_far_cis_prop = far_cis_pos_ratio / (far_cis_pos_ratio + trans_pos_ratio)) %>%
+    mutate(total_cis_hits = total_cis_hits, .before = far_cis_hits) %>% 
+    mutate(prop_far_cis_hits = far_cis_hits / total_cis_hits, .after = far_cis_hits)
+}
+
+# compute overall cis-hit ratio beyond 250kb
+cis_stats_250kb_2mb <- calc_hit_ratios_dist(cis_results_filt, trans_pos_ratio = trans_pos_ratio,
+                                            min_dist = dist_threshold_kb * 1000, max_dist = 2e6)
+
+# compute overall cis-hit ratio beyond 250kb and within 1Mb
+cis_stats_250kb_1mb <- calc_hit_ratios_dist(cis_results_filt, trans_pos_ratio = trans_pos_ratio,
+                                            min_dist = dist_threshold_kb * 1000, max_dist = 1e6)
+
+# combine into one table
+cis_stats <- bind_rows(`2mb` = cis_stats_250kb_2mb, `1mb` = cis_stats_250kb_1mb, .id = "max_dist")
+
+# save to table
+outfile <- "results/additional_analyses/indirect_effects_proportions_gasperini.csv"
+write_csv(cis_stats, file = outfile)
+```
+
+## Impact on model performance
+Any positive pairs beyond 250kb have been filtered out of the combined CRISPR dataset, since beyond
+positives beyond that distance are expected to be heavily polluted by indirect effects, which
+negatively impact model performance.
+
+In addition, the same analysis is done for the combined training and held-out datasets, as well as
+the held-out K562 CRISPR data without DC-TAP-seq and K562 DC-TAP-seq.
+```{r}
+# function to plot performance of ENCODE-rE2G on filtered vs. unfiltered CRISPR data in one PRC
+plot_perf_filt_unfilt <- function(merged_unfilt, merged_filt, pred_config, title,
+                                  plot_thresholds = TRUE) {
+  
+  # only include ENCODE-rE2G models
+  pred_config <- filter(pred_config, pred_id %in% c("ENCODE_rE2G", "ENCODE_rE2Gext"))
+  
+  # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+  merged_unfilt <- processMergedData(merged_unfilt, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE,
+                                     distToTSS_as_kb = TRUE)
+  merged_filt <- processMergedData(merged_filt, pred_config = pred_config,
+                                 filter_valid_connections = TRUE,
+                                 include_missing_predictions = TRUE,
+                                 distToTSS_as_kb = TRUE)
+  
+  # calculate precision-recall curves
+  pr_unfilt <- calcPRCurves(merged_unfilt, pred_config = pred_config, pos_col = "Regulated")
+  pr_filt <- calcPRCurves(merged_filt, pred_config = pred_config, pos_col = "Regulated")
+  
+  # create separate predictor names for unfiltered and filtered data in pred config
+  pred_config_unfilt <- pred_config %>% 
+    mutate(pred_id = paste0(pred_id, "_unfilt"),
+           pred_name_long = paste(pred_name_long, "(unfiltered)")) %>% 
+    mutate(pred_uid = paste(pred_id, pred_col, sep = ".")) %>% 
+    mutate(color = if_else(pred_id == "ENCODE_rE2G_unfilt", true = "#DC6464", false = "#9B241C"))
+  
+  pred_config_filt <- pred_config %>% 
+    mutate(pred_id = paste0(pred_id, "_filt"),
+           pred_name_long = paste(pred_name_long, "(filtered)")) %>% 
+    mutate(pred_uid = paste(pred_id, pred_col, sep = ".")) %>% 
+    mutate(color = if_else(pred_id == "ENCODE_rE2G_filt", true = "#6494dc", false = "#1a4396"))
+  
+  pred_config <- rbind(pred_config_unfilt, pred_config_filt)
+  
+  # and change predictor names accordingly in precision-recall tables
+  pr_unfilt <- pr_unfilt %>% 
+    mutate(pred_uid = if_else(pred_uid == "ENCODE_rE2G.Score", true = "ENCODE_rE2G_unfilt.Score",
+                              false = "ENCODE_rE2Gext_unfilt.Score"))
+  pr_filt <- pr_filt %>% 
+    mutate(pred_uid = if_else(pred_uid == "ENCODE_rE2G.Score", true = "ENCODE_rE2G_filt.Score",
+                              false = "ENCODE_rE2Gext_filt.Score"))
+  
+  # combine precision-recall tables
+  pr <- rbind(pr_unfilt, pr_filt)
+  
+  # calculate proportion of positives in CRISPR data
+  pct_pos <- mean(mean(merged_unfilt$Regulated), mean(merged_filt$Regulated))
+  
+  # make precision-recall curve plot for unfiltered and filtered CRISPR data
+  pred_colors <- deframe(select(pred_config, pred_name_long, color))
+  makePRCurvePlot(pr, n_pos = 0, pct_pos = pct_pos,
+                  pred_config = pred_config, min_sensitivity = 0.7, line_width = 0.8,
+                  point_size = 3, text_size = 13, plot_name = title,
+                  colors = pred_colors, plot_thresholds = plot_thresholds) +
+    geom_vline(xintercept = 0.7, linetype = "dashed", color = "black") +
+    labs(x = "Recall") +
+    theme_classic()
+    
+}
+```
+
+### Note S1 plots
+Plot the positive hit ratio as a function of distance plus the impact of filtering out positives
+more than 250kb away from the TSS on ENCODE-rE2G performance.
+```{r}
+# import pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_main_benchmarks")
+
+# load merged data for filtered and unfiltered training crispr dataset
+merged_unfilt <- fread(snakemake@input$merged_combined_unfilt,
+                       colClasses = c("ValidConnection" = "character"))
+merged_filt <- fread(snakemake@input$merged_combined_filt,
+                     colClasses = c("ValidConnection" = "character"))
+
+# plot ENCODE-rE2G performance on unfiltered vs. filtered combined CRISPR training dataset
+p2 <- plot_perf_filt_unfilt(merged_unfilt, merged_filt, pred_config, plot_thresholds = FALSE,
+                            title = "Combined training CRISPR data")
+```
+
+```{r}
+# import pred_config file
+pred_config_alpha <- importPredConfig(snakemake@input$pred_config_alpha, expr = TRUE,
+                                      include_col = "crispr_main_benchmarks")
+
+# load merged data for filtered and unfiltered held-out crispr dataset
+merged_unfilt <- fread(snakemake@input$merged_heldout_unfilt,
+                       colClasses = c("ValidConnection" = "character"))
+merged_filt <- fread(snakemake@input$merged_heldout_filt,
+                     colClasses = c("ValidConnection" = "character"))
+
+# plot ENCODE-rE2G performance on unfiltered vs. filtered combined CRISPR training dataset
+p3 <- plot_perf_filt_unfilt(merged_unfilt, merged_filt, pred_config_alpha, plot_thresholds = TRUE,
+                            title = "Combined heldout CRISPR data")
+```
+
+```{r, fig.width=13, fig.height=4}
+# combined plots into one figure
+plot_grid(p1,
+          p2 + theme(legend.position = "none"),
+          p3 + theme(legend.position = "none"),
+          get_legend(p2), 
+          nrow = 1, rel_widths = c(1, 0.7, 0.7, 0.4), labels = c("a", "b"))
+
+# save plot to pdf file
+ggsave(filename = "results/manuscript/plots/crispr_noteS1_indirect_effects.pdf", height = 4,
+       width = 15)
+```
+
+### Held-out K562 CRISPR datasets, no DC-TAP-seq
+```{r, fig.width=7, fig.height=4}
+# load merged data for filtered and unfiltered crispr datasets
+merged_unfilt <- fread(snakemake@input$merged_notap_unfilt,
+                       colClasses = c("ValidConnection" = "character"))
+merged_filt <- fread(snakemake@input$merged_notap_filt,
+                     colClasses = c("ValidConnection" = "character"))
+
+# plot ENCODE-rE2G performance on unfiltered vs. filtered combined CRISPR training dataset
+p4 <- plot_perf_filt_unfilt(merged_unfilt, merged_filt, pred_config_alpha, plot_thresholds = TRUE,
+                            title = "K562 held-out, no DC-TAP-seq")
+```
+
+### K562 DC-TAP-seq
+```{r, fig.width=7, fig.height=4}
+# load merged data for filtered and unfiltered crispr datasets
+merged_unfilt <- fread(snakemake@input$merged_k562dctap_unfilt,
+                       colClasses = c("ValidConnection" = "character"))
+merged_filt <- fread(snakemake@input$merged_k562dctap_filt,
+                     colClasses = c("ValidConnection" = "character"))
+
+# plot ENCODE-rE2G performance on unfiltered vs. filtered combined CRISPR training dataset
+p5 <- plot_perf_filt_unfilt(merged_unfilt, merged_filt, pred_config_alpha, plot_thresholds = TRUE,
+                            title = "K562 DC-TAP-seq")
+```
+
+```{r, fig.width=14, fig.height=4}
+# combined all PRC plots into one figure
+plot_grid(p2, p3, p4, p5, nrow = 2)
+
+# save plot to pdf file
+ggsave(filename = "results/additional_analyses/indirect_effects_filter.pdf", height = 7, width = 12)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

@@ -1,0 +1,295 @@
+---
+title: "Main Figure 2 CRISPR benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Benchmark ENCODE-rE2G and other E-G models against combined K562 CRISPR data and make plots for
+manuscript. ENCODE-rE2G was trained using the combined CRISPR data and therefore all analyses use
+cross-validated predictions to mitigate overfitting.
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(GenomicRanges)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+source("workflow/scripts/random_gene_pred_functions.R")
+```
+
+***
+
+## Load and process input data
+Load and process output from CRISPR benchmarking pipeline.
+```{r loadData}
+# load TSS annotations
+tss_annot <- read_tsv(snakemake@input$tss_annot, show_col_types = FALSE, col_select = 1:6)
+
+# create GRanges object with TSS annotations
+tss_annot <- makeGRangesFromDataFrame(tss_annot, seqnames.field = "#chr", keep.extra.columns = TRUE,
+                                      starts.in.df.are.0based = TRUE)
+
+# load list of expressed genes in K562
+expr_genes <- fread(snakemake@input$expr_genes)
+
+# load performance summary table
+perf <- fread(snakemake@input$perf_summary)
+
+# load merged data for the combined CRISPR dataset
+merged <- fread(snakemake@input$merged_data)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_main_benchmarks")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged <- processMergedData(merged, pred_config = pred_config,
+                            filter_valid_connections = TRUE,
+                            include_missing_predictions = TRUE)
+```
+
+Split data into two sets of E-G models based on used feature by each predictive models
+("Full features" or "DNase-seq only"). Also filter out baseline predictors not used for plots in
+main figures.
+```{r splitData}
+# define predictor sets
+full_preds <- c("ENCODE_rE2Gext.Score", "ABCfull.ABC.Score", "EPIraction.Score",
+                "CIA.CIA_norm.Score","EnformerCRISPR.Score",
+                "GraphReg_score.GraphReg_L_8_dnase_h3k27ac.Score", "EpiMap.Score")
+dnase_preds <- c("ENCODE_rE2G.Score", "ABCdnase.ABC.Score",
+                 "correlation_k562_dnase.glsDNase.Score")
+baseline_preds <- c("baseline.distToTSS", "baseline.nearestExprGene")
+
+# filter merged data from CRISPR benchmarking pipeline by predictor sets
+merged <- filter(merged, pred_uid %in% c(full_preds, dnase_preds, baseline_preds))
+merged_ext <- filter(merged, pred_uid %in% c(full_preds, baseline_preds))
+merged_dnase <- filter(merged, pred_uid %in% c(dnase_preds, baseline_preds))
+```
+
+***
+
+## Precision-recall curves
+Create main plots comparing the performance of ENCODE-rE2G (DNase-only and extended) against other
+E-G models. The results from this analysis isn't different from the output of the CRISPR
+benchmarking pipeline, but here the customized PRC plots for the manuscript are created.
+
+Simulate precision and recall for linking each CRISPR enhancer to a random expressed gene within
+500kb as additional baseline predictor.
+```{r computeRandomGenePred}
+# get expressed TSSs in K562
+expr_tss <- tss_annot[tss_annot$name %in% expr_genes$gene]
+
+# compute precision and recall for random predictor and create row to add to PR table
+random_pr <- simulateRandomGenePred(merged, tss_annot = expr_tss, max_distance = 5e5)
+```
+
+Compute precision recall curves for all predictors (for legend) and each predictive model set
+separately.
+```{r computePRC}
+# compute precision-recall table
+pr_all <- calcPRCurves(merged, pred_config = pred_config, pos_col = "Regulated")
+pr_full <- calcPRCurves(merged_ext, pred_config = pred_config, pos_col = "Regulated")
+pr_dnase <- calcPRCurves(merged_dnase, pred_config = pred_config, pos_col = "Regulated")
+
+# add random gene PR values to pr table
+pr_all <- bind_rows(pr_all, random_pr)
+pr_full <- bind_rows(pr_full, random_pr)
+pr_dnase <- bind_rows(pr_dnase, random_pr)
+
+# calculate number and percentage of experimental true positives in the CRISPR dataset
+n_pos <- calcNPos(merged, pos_col = "Regulated")
+pct_pos <- calcPctPos(merged, pos_col = "Regulated")
+```
+
+Get color for each predictor to use in plots and order according to AUPRC performance to order
+predictors in plot legend according to performance.
+```{r getPredColors}
+# get performance of predictors to show and add "predictor set" information
+pred_config_colors <- pred_config %>%
+  filter(pred_uid %in% c(full_preds, dnase_preds, baseline_preds, "baseline.randomExprGene")) %>% 
+  left_join(select(perf, pred_name_long, AUPRC), by = "pred_name_long") %>%
+  mutate(set = case_when(
+    pred_uid %in% full_preds ~ "full",
+    pred_uid %in% dnase_preds ~ "dnase",
+    TRUE ~ "baseline"
+  ))
+
+# order according to predictor set and performance to create colors of predictors in correct order
+# to show in plot legends
+pred_colors <- pred_config_colors %>% 
+  mutate(set = fct_inorder(set)) %>% 
+  arrange(set, desc(AUPRC)) %>% 
+  select(pred_name_long, color) %>% 
+  deframe()
+```
+
+Create two precision-recall curve plots, one for the "Extended" and one for the "DNase-seq only"
+feature set.
+```{r makePRCPlot, fig.height=4.5, fig.width=12.5}
+# create titles for PRC plots
+title_full <- "Predicting CRISPR links\nFull models"
+title_dnase <- "Predicting CRISPR links\nDNase-only features"
+
+# create PR curve plots
+prc_all <- makePRCurvePlot(pr_all, n_pos = n_pos, pct_pos = pct_pos,
+                           pred_config = pred_config, min_sensitivity = 0.7, line_width = 0.8,
+                           point_size = 3, text_size = 15, colors = pred_colors)
+
+prc_full <- makePRCurvePlot(pr_full, n_pos = n_pos, pct_pos = pct_pos, plot_name = title_full,
+                            pred_config = pred_config, min_sensitivity = 0.7, line_width = 0.8,
+                            point_size = 3, text_size = 15, colors = pred_colors,
+                            plot_thresholds = FALSE) + 
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+
+prc_dnase <- makePRCurvePlot(pr_dnase, n_pos = n_pos, pct_pos = pct_pos, plot_name = title_dnase,
+                             pred_config = pred_config, min_sensitivity = 0.7, line_width = 0.8,
+                             point_size = 3, text_size = 15, colors = pred_colors,
+                             plot_thresholds = FALSE) + 
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+
+# extract legend from prc_all plot
+legend <- get_legend(prc_all)
+
+# arrange into one plot
+plot_grid(
+  prc_full + theme_classic() + theme(legend.position = "none"),
+  prc_dnase + theme_classic() + theme(legend.position = "none"),
+  legend,
+  nrow = 1
+)
+```
+
+```{r savePRCPlotToFile}
+# save to pdf
+ggsave(filename = "results/manuscript/plots/main_fig2b_crispr_prc.pdf", height = 4.5, width = 12.5)
+```
+
+***
+
+## Performance across distance to TSS
+Plot the AUPRC performance of each predictive model as function of distance to TSS in three distance
+bins 0-10kb, 10-100kb, 100kb-2.5Mb. This plot is created using the performance summary created by
+the CRISPR benchmarking pipeline.
+```{r makePrefVsDistPlot, fig.height=4, fig.width=6, message=FALSE}
+# distance bins in kb
+dist_breaks <- c(0, 10, 100, 2500)
+
+# convert distance to TSS to kb and bin into distance bins
+dist_bins <- merged %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  mutate(pred_value = pred_value / 1000) %>% 
+  mutate(dist_bin = cut(pred_value, breaks = dist_breaks, right = FALSE)) %>% 
+  select(name, dist_bin)
+
+# add distance bins to merged
+merged_bins <- left_join(merged, dist_bins, by = "name") %>%
+  filter(!is.na(dist_bin))
+
+# compute performance for each distance bin
+perf_dist <- computePerfSubsets(merged = merged_bins, pred_config = pred_config,
+                                subset_col = "dist_bin", metric = "auprc", bs_iter = 1000)
+
+# create distance to TSS stratified performance plots
+perf_dist_title <- "CRISPR prediction performance versus distance to TSS"
+perf_dist_plots <- plotPerfSubsets(perf_dist, pred_config = pred_config,
+                                   subset_name = "Distance to TSS (kb)",
+                                   title = perf_dist_title, order = names(pred_colors))
+
+# apply custom axis labels and classic ggplot theme
+perf_dist_plots +
+  labs(y = "Performance\n(AUPRC)") +
+  theme_classic() +
+  theme(legend.position = "bottom", legend.text = element_text(size = 6),
+        legend.key.size = unit(0.3, "cm"), legend.title=element_blank(),
+        plot.title = element_text(size = 12))
+```
+
+```{r savePrefVsDistPlotToFile}
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/main_fig2c_crispr_performance_distance.pdf", height = 4,
+       width = 6)
+```
+
+***
+
+## Pairwise comparisons
+Calculate significance for all pairwise predictor comparisons of AUPRC or precision at chosen
+thresholds.
+
+### Pairwise AUPRC significance tests
+```{r pwTestsAUPRC, message=FALSE, fig.height=7, fig.width=9}
+# convert merged data to bootstrapping format
+merged_bs <- convertMergedForBootstrap(merged, pred_config = pred_config)
+
+# compute all pairwise delta bootstraps
+pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = 10000, conf = 0.95,
+                                            ci_type = "perc", ncpus = 4)
+
+# plot bootstrapped delta confidence intervals
+plotBootstrappedIntervals(pw_delta_auprc)
+
+# save test results to file
+write_tsv(pw_delta_auprc, file = "results/manuscript/tables/main_fig2_pairwise_auprc_comparisons.tsv")
+```
+
+### Pairwise precision at threshold significance tests
+```{r pwTestsPrecision, message=FALSE, fig.height=7, fig.width=9}
+# get thresholds @70% recall for all predictors
+thresholds <- perf %>% 
+  filter(pred_uid %in% colnames(merged_bs)) %>% 
+  select(pred_uid, ThresholdMinSens) %>% 
+  deframe()
+
+# compute all pairwise delta bootstraps
+pw_delta_prec <- bootstrapDeltaPerformance(merged_bs, metric = "precision",
+                                           thresholds = thresholds, R = 10000, conf = 0.95,
+                                           ci_type = "perc", ncpus = 4)
+
+# plot bootstrapped delta confidence intervals
+plotBootstrappedIntervals(pw_delta_prec)
+
+# save test results to file
+write_tsv(pw_delta_prec, file = "results/manuscript/tables/main_fig2_pairwise_precision_comparisons.tsv")
+```
+
+***
+
+## Specific precision-recall values
+Print precision-recall values for specific baseline predictors used in manuscript text:
+```{r}
+# get precision-recall values for baseline predictors
+pr_values <- pr_all %>% 
+  filter(grepl("baseline", pred_uid), alpha == 1) %>% 
+  select(predictor = pred_uid, precision, recall)
+
+# print table
+knitr::kable(pr_values)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

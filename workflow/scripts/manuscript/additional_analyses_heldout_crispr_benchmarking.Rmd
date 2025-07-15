@@ -1,0 +1,566 @@
+---
+title: "Main Figure 2 heldout CRISPR data benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# save.image("additional_analyses.rda")
+# stop()
+
+# set output html chunk options
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(ggExtra)
+library(cowplot)
+library(DT)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+## Load and process input data
+Load and process output from CRISPR benchmarking pipeline.
+```{r prepareData}
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = FALSE,
+                                include_col = "crispr_main_benchmarks")
+
+# load merged data for both datasets
+crispr_cols <- cols(ValidConnection = col_character(), merged_uid = col_character())
+merged_training <- read_tsv(snakemake@input$merged_training, col_types = crispr_cols)
+merged_heldout  <- read_tsv(snakemake@input$merged_heldout,  col_types = crispr_cols)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_training <- processMergedData(merged_training, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE)
+
+merged_heldout <- processMergedData(merged_heldout, pred_config = pred_config,
+                                    filter_valid_connections = TRUE,
+                                    include_missing_predictions = TRUE)
+
+# get models to compare
+models <- pred_config %>% 
+  filter(boolean == FALSE, pred_uid %in% merged_heldout$pred_uid) %>% 
+  pull(pred_uid)
+
+# only retain data on models to compare
+pred_config <- filter(pred_config, pred_uid %in% models)
+merged_training <- filter(merged_training, pred_uid %in% models)
+merged_heldout <- filter(merged_heldout, pred_uid %in% models)
+
+# get thresholds to compute performance
+thresholds <- getThresholdValues(pred_config, threshold_col = "alpha")
+
+# number of boostrap samplings to use in all analyses
+R <- 1000
+```
+
+## Calculate performance for "enhancer strength" subsets
+Calculate performance for different sets of E-G pairs defined by element classes and CRISPR effect
+sizes.
+```{r definePerfFunctions}
+# function to filter CRISPR dataset for E-G pairs from specified element classes and above a
+# minimum effect size. pairs not passing the filter can either be removed or 'Regulated' column
+# can be set to FALSE
+filter_class_and_effect_size <- function(merged, class = NA, effect_size = NA,
+                                         filter = c("regulate", "remove"),
+                                         category_col = "element_category") {
+  
+  filter <- match.arg(filter)
+    
+  # apply filter based on class and effect size filters if specified
+  if (!all(is.na(class))) {
+    merged <- merged %>% 
+      mutate(ValidConnection = if_else(!!sym(category_col) %in% class,
+                                       true = ValidConnection, 
+                                       false = "filter_element_class"))
+  }
+  
+  if (!is.na(effect_size)) {
+    merged <- merged %>% 
+      mutate(ValidConnection = if_else(Regulated == TRUE & abs(EffectSize) < abs(effect_size),
+                                       true = "filter_effect_size", 
+                                       false = ValidConnection))
+  }
+  
+  # either remove pairs not passing the filter or set their 'Regulated' column value to FALSE
+  filters <- c("filter_effect_size", "filter_element_class")
+  if (filter == "regulate") {
+    merged <- merged %>% 
+      mutate(Regulated = if_else(ValidConnection %in% filters, true = FALSE, false = Regulated),
+             ValidConnection = if_else(ValidConnection %in% filters, true = "TRUE",
+                                       false = ValidConnection))
+  } else {
+    merged <- filter(merged, !ValidConnection %in% filters)
+  }
+  
+  return(merged)
+  
+}
+
+# calculate performance for element class and effect size filtered benchmarking datasets
+calc_performance_class_and_effect_size <- function(class = NA, effect_size = NA, merged,
+                                                   pred_config, metric, filter = "regulate",
+                                                   category_col = "element_category",
+                                                   predictors = NULL,
+                                                   thresholds = NULL, R = 1000, conf = 0.95,
+                                                   ncpus = 1, ci_type = "perc") {
+  
+  
+  # reset 'Regulated' column based on classes and effect sizes and convert to bootstrapping format
+  merged <- filter_class_and_effect_size(merged, class = class, effect_size = effect_size,
+                                         filter = filter, category_col = category_col)
+  merged_bs <- convertMergedForBootstrap(merged, pred_config = pred_config)
+
+  # run bootstraps
+  perf_ci <- bootstrapPerformanceIntervals(merged_bs, metric = metric, predictors = predictors,
+                                           thresholds = thresholds, R = R, conf = conf,
+                                           ncpus = ncpus, ci_type = ci_type)
+  
+  return(perf_ci)
+  
+}
+
+# plot performance as function of effect size
+plot_performance <- function(perf, model, title, metric) {
+  
+  # get recall on training and held-out data for ENCODE-rE2G
+  perf <- filter(perf, id == model)
+
+  # plot recall on "H3K27ac high" enhancers as a function of effect size
+  ggplot(perf, aes(x = effect_size, y = full, color = Dataset)) +
+    geom_point(size = 2) +
+    geom_line() +
+    geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.005) + 
+    labs(title = title, x = "CRISPR effect size", y = metric) +
+    scale_color_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+    scale_x_reverse(breaks = effect_sizes, labels = scales::percent) +
+    scale_y_continuous(limits = c(0, 1)) +
+    theme_bw()
+  
+}
+```
+
+### Unfiltered element classes
+Calculate performance as a function of minimum CRISPR effect size of positives.
+```{r, fig.width=7, fig.height=4}
+# range of minimum CRISPR effect sizes for which recall should be calculated
+effect_sizes <- seq(from = 0, to = -0.25, by = -0.025)
+effect_sizes <- structure(effect_sizes, names = effect_sizes)
+
+# calculate recall across effect sizes and specified class for training CRISPR data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = NA,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "regulate", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = NA,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "regulate", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score", title = "ENCODE-rE2G recall all elements",
+                 metric = "Recall")
+```
+
+
+### H3K27ac high
+Calculate performance only for CRISPR E-G pairs with "H3K27ac high" enhancers as a function of 
+minimum CRISPR effect size of positives.
+```{r, fig.width=7, fig.height=4}
+# E-G pairs with other classes than this will be considered CRISPR negatives
+class <- "H3K27ac high"
+
+# calculate recall across effect sizes and specified class for training CRISPR data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "regulate", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "regulate", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score", title = "ENCODE-rE2G recall \"H3K27ac high\"",
+                 metric = "Recall")
+```
+
+### H3K27ac medium & high
+Calculate performance only for CRISPR E-G pairs with "H3K27ac medium" and "H3K27ac high" enhancers
+as a function of minimum CRISPR effect size of positives.
+```{r, fig.width=7, fig.height=4}
+# E-G pairs with other classes than this will be considered CRISPR negatives
+class <- c("H3K27ac high", "H3K27ac medium")
+
+# calculate recall across effect sizes and specified class for training CRISPR data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "regulate", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "regulate", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G recall \"H3K27ac medium & high\"", metric = "Recall")
+```
+
+### Filter out H3K27ac low only
+Calculate performance for CRISPR E-G pairs without "H3K27ac low" enhancers as a function of minimum
+CRISPR effect size of positives.
+```{r, fig.width=7, fig.height=4}
+# E-G pairs with other classes than this will be considered CRISPR negatives
+class <- c("H3K27ac high", "H3K27ac medium", "H3K27me3 overlap", "CTCF overlap")
+
+# calculate recall across effect sizes and specified class for training CRISPR data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "regulate", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "regulate", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G recall no \"H3K27ac low\"", metric = "Recall")
+```
+
+```{r, fig.width=7, fig.height=4}
+# E-G pairs with other classes than this will be considered CRISPR negatives
+class <- c("H3K27ac high", "H3K27ac medium", "H3K27me3 overlap", "CTCF overlap")
+
+# only compute recall for non-ubiquitously expressed genes in training data
+prec_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                          merged = merged_training, pred_config = pred_config, metric = "precision", 
+                          filter = "regulate", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+prec_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                         merged = merged_heldout, pred_config = pred_config, metric = "precision", 
+                         filter = "regulate", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+prec_training <- bind_rows(prec_training, .id = "effect_size")
+prec_heldout  <- bind_rows(prec_heldout, .id = "effect_size")
+prec <- bind_rows(Training = prec_training, `Held-out` = prec_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(prec, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G precision no \"H3K27ac low\"", metric = "Precision")
+```
+
+```{r, fig.width=7, fig.height=4}
+# E-G pairs with other classes than this will be considered CRISPR negatives
+class <- c("H3K27ac high", "H3K27ac medium", "H3K27me3 overlap", "CTCF overlap")
+
+# only compute recall for non-ubiquitously expressed genes in training data
+prec_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                          merged = merged_training, pred_config = pred_config, metric = "precision", 
+                          filter = "remove", category_col = "element_category",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+prec_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = class,
+                         merged = merged_heldout, pred_config = pred_config, metric = "precision", 
+                         filter = "remove", category_col = "element_category",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+prec_training <- bind_rows(prec_training, .id = "effect_size")
+prec_heldout  <- bind_rows(prec_heldout, .id = "effect_size")
+prec <- bind_rows(Training = prec_training, `Held-out` = prec_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(prec, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G precision no \"H3K27ac low\"", metric = "Precision")
+```
+
+
+## Stratify by gene expression uniformity
+Compare recall for ubiquitously expressed genes vs. non-ubiquitously expressed genes.
+```{r, fig.width=7, fig.height=4}
+# load file containing list of ubiquitously expressed genes
+ubiq_expr <- snakemake@input$ubiquitously_expressed %>% 
+  read_tsv(show_col_types = FALSE) %>% 
+  select(measuredGeneSymbol = GeneSymbol, is_ubiqutious_uniform) %>% 
+  distinct()
+
+# label genes in merged data based on whether they are ubiquitously expressed or not
+merged_training <- left_join(merged_training, ubiq_expr, by = "measuredGeneSymbol")
+merged_heldout  <- left_join(merged_heldout,  ubiq_expr, by = "measuredGeneSymbol")
+```
+
+### Only non-ubiquitously expressed genes
+
+##### Recall
+```{r, fig.width=7, fig.height=4}
+# only compute recall for non-ubiquitously expressed genes in training data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = FALSE,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "remove", category_col = "is_ubiqutious_uniform",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = FALSE,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "remove", category_col = "is_ubiqutious_uniform",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G recall non-ubiquitously expressed genes", metric = "Recall")
+```
+
+##### Precision
+```{r, fig.width=7, fig.height=4}
+# only compute recall for non-ubiquitously expressed genes in training data
+prec_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = FALSE,
+                          merged = merged_training, pred_config = pred_config, metric = "precision", 
+                          filter = "remove", category_col = "is_ubiqutious_uniform",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+prec_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = FALSE,
+                         merged = merged_heldout, pred_config = pred_config, metric = "precision", 
+                         filter = "remove", category_col = "is_ubiqutious_uniform",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+prec_training <- bind_rows(prec_training, .id = "effect_size")
+prec_heldout  <- bind_rows(prec_heldout, .id = "effect_size")
+prec <- bind_rows(Training = prec_training, `Held-out` = prec_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(prec, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G precision non-ubiquitously expressed genes",
+                 metric = "Precision")
+```
+
+### Only ubiquitously expressed genes
+
+##### Recall
+```{r, fig.width=7, fig.height=4}
+# only compute recall for non-ubiquitously expressed genes in training data
+recall_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = TRUE,
+                          merged = merged_training, pred_config = pred_config, metric = "recall", 
+                          filter = "remove", category_col = "is_ubiqutious_uniform",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+recall_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = TRUE,
+                         merged = merged_heldout, pred_config = pred_config, metric = "recall", 
+                         filter = "remove", category_col = "is_ubiqutious_uniform",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+recall_training <- bind_rows(recall_training, .id = "effect_size")
+recall_heldout  <- bind_rows(recall_heldout, .id = "effect_size")
+recall <- bind_rows(Training = recall_training, `Held-out` = recall_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(recall, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G recall ubiquitously expressed genes", metric = "Recall")
+```
+
+##### Precision
+```{r, fig.width=7, fig.height=4}
+# only compute recall for non-ubiquitously expressed genes in training data
+prec_training <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = TRUE,
+                          merged = merged_training, pred_config = pred_config, metric = "precision", 
+                          filter = "remove", category_col = "is_ubiqutious_uniform",
+                          thresholds = thresholds, R = R)
+
+# do the same for the held-out CRISPR data
+prec_heldout <- lapply(effect_sizes, FUN = calc_performance_class_and_effect_size, class = TRUE,
+                         merged = merged_heldout, pred_config = pred_config, metric = "precision", 
+                         filter = "remove", category_col = "is_ubiqutious_uniform",
+                         thresholds = thresholds, R = R)
+
+# combined recall into one table
+prec_training <- bind_rows(prec_training, .id = "effect_size")
+prec_heldout  <- bind_rows(prec_heldout, .id = "effect_size")
+prec <- bind_rows(Training = prec_training, `Held-out` = prec_heldout, .id = "Dataset") %>% 
+  mutate(effect_size = as.numeric(effect_size))
+
+# plot performance
+plot_performance(prec, model = "ENCODE_rE2G.Score",
+                 title = "ENCODE-rE2G precision ubiquitously expressed genes", metric = "Precision")
+```
+
+## Precision recall curve filtered data
+Filter held-out and training data according to following criteria:
+- Set all CTCF and H3K27me3 to Regulate = FALSE
+- Filter out or set Regulated = FALSE for all "H3K27ac low" E-G pairs with <10% effect size
+
+Then compute precision recall curve and compare precision and recall at threshold.
+```{r}
+make_prc <- function(merged, pred_config, title) {
+  pr <- calcPRCurves(merged, pred_config = pred_config, pos_col = "Regulated")
+  n_pos <- calcNPos(merged, pos_col = "Regulated")
+  pct_pos <- calcPctPos(merged, pos_col = "Regulated")
+  makePRCurvePlot(pr, n_pos = n_pos, pct_pos = pct_pos, pred_config = pred_config,
+                  min_sensitivity = 0.7, line_width = 0.8, plot_name = title,
+                  point_size = 3, text_size = 15, colors = pred_colors) +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+}
+```
+
+```{r}
+# set CTCF and H3K27me3 to Regulate = FALSE
+filt_class <- c("CTCF overlap", "H3K27me3 overlap")
+merged_training_enhOnly <- merged_training %>% 
+  mutate(Regulated = if_else(element_category %in% filt_class, true = FALSE, false = Regulated))
+merged_heldout_enhOnly <- merged_heldout %>% 
+  mutate(Regulated = if_else(element_category %in% filt_class, true = FALSE, false = Regulated))
+
+
+# set Regulated = FALSE for H3k27ac low pairs and <10% positives
+class <- c("H3K27ac high", "H3K27ac medium", "H3K27me3 overlap", "CTCF overlap")
+merged_training_flipWeak <- filter_class_and_effect_size(merged_training_enhOnly, class = class,
+                                                         effect_size = -0.1, filter = "regulate")
+merged_heldout_flipWeak <- filter_class_and_effect_size(merged_heldout_enhOnly, class = class,
+                                                        effect_size = -0.1, filter = "regulate")
+
+# filter out H3k27ac low pairs and <10% positives
+merged_training_removeWeak <- filter_class_and_effect_size(merged_training_enhOnly, class = class,
+                                                           effect_size = -0.1, filter = "remove")
+merged_heldout_removeWeak <- filter_class_and_effect_size(merged_heldout_enhOnly, class = class,
+                                                          effect_size = -0.1, filter = "remove")
+```
+
+```{r, fig.width=12.5, fig.height=4.5}
+# get predictor colors
+pred_colors <- pred_config %>%
+  select(pred_name_long, color) %>% 
+  deframe()
+
+# make PRC for filtered training and held-out dataset when filtering out weak enhancers
+prc_merged_training_flipWeak <- make_prc(merged_training_flipWeak, pred_config, title = "Training (flip weak)")
+prc_merged_heldout_flipWeak  <- make_prc(merged_heldout_flipWeak,  pred_config, title = "Held-out (flip weak)")
+
+# arrange plots
+plot_grid(prc_merged_training_flipWeak + theme(legend.position = "none"),
+          prc_merged_heldout_flipWeak,
+          nrow = 1, rel_widths = c(0.6, 1))
+```
+
+```{r, fig.width=12.5, fig.height=4.5}
+# make PRC for filtered training and held-out dataset when filtering out weak enhancers
+prc_merged_training_removeWeak <- make_prc(merged_training_removeWeak, pred_config, title = "Training (remove weak)")
+prc_merged_heldout_removeWeak  <- make_prc(merged_heldout_removeWeak,  pred_config, title = "Held-out (remove weak)")
+
+# arrange plots
+plot_grid(prc_merged_training_removeWeak + theme(legend.position = "none"),
+          prc_merged_heldout_removeWeak,
+          nrow = 1, rel_widths = c(0.6, 1))
+```
+
+Leave CTCF and H3K27me3 sites in and remove H3K27ac low or <10% positives.
+```{r, fig.width=12.5, fig.height=4.5}
+# filter out H3k27ac low pairs and <10% positives
+merged_training_removeWeak <- filter_class_and_effect_size(merged_training, class = class,
+                                                           effect_size = -0.1, filter = "remove")
+merged_heldout_removeWeak <- filter_class_and_effect_size(merged_heldout, class = class,
+                                                          effect_size = -0.1, filter = "remove")
+
+# make PRC for filtered training and held-out dataset when filtering out weak enhancers
+prc_merged_training_removeWeak <- make_prc(merged_training_removeWeak, pred_config, title = "Training (remove weak)")
+prc_merged_heldout_removeWeak  <- make_prc(merged_heldout_removeWeak,  pred_config, title = "Held-out (remove weak)")
+
+# arrange plots
+plot_grid(prc_merged_training_removeWeak + theme(legend.position = "none"),
+          prc_merged_heldout_removeWeak,
+          nrow = 1, rel_widths = c(0.6, 1))
+```
+
+Do the same for 15% minimum effect size.
+```{r, fig.width=12.5, fig.height=4.5}
+# filter out H3k27ac low pairs and <10% positives
+merged_training_removeWeak <- filter_class_and_effect_size(merged_training, class = class,
+                                                           effect_size = -0.15, filter = "remove")
+merged_heldout_removeWeak <- filter_class_and_effect_size(merged_heldout, class = class,
+                                                          effect_size = -0.15, filter = "remove")
+
+# make PRC for filtered training and held-out dataset when filtering out weak enhancers
+prc_merged_training_removeWeak <- make_prc(merged_training_removeWeak, pred_config, title = "Training (remove weak)")
+prc_merged_heldout_removeWeak  <- make_prc(merged_heldout_removeWeak,  pred_config, title = "Held-out (remove weak)")
+
+# arrange plots
+plot_grid(prc_merged_training_removeWeak + theme(legend.position = "none"),
+          prc_merged_heldout_removeWeak,
+          nrow = 1, rel_widths = c(0.6, 1))
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

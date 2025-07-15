@@ -1,0 +1,753 @@
+---
+title: "Main Figure 2 heldout CRISPR data benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# save.image("heldout_crispr.rda")
+# stop()
+
+# set output html chunk options
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(ggExtra)
+library(cowplot)
+library(DT)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+## Load and process input data
+Load and process output from CRISPR benchmarking pipeline.
+```{r prepareData}
+# column types in crispr data files
+crispr_cols <- cols(ValidConnection = col_character())
+
+# load crispr data files
+crispr_training <- read_tsv(snakemake@input$crispr_training, col_types = crispr_cols)
+crispr_heldout <- read_tsv(snakemake@input$crispr_heldout, col_types = crispr_cols)
+
+# load performance summary tables
+perf_training <- read_tsv(snakemake@input$perf_training, show_col_types = FALSE)
+perf_heldout <- read_tsv(snakemake@input$perf_heldout, show_col_types = FALSE)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = FALSE,
+                                include_col = "crispr_main_benchmarks")
+
+# load merged data for both datasets
+merged_training <- read_tsv(snakemake@input$merged_training, col_types = crispr_cols)
+merged_heldout  <- read_tsv(snakemake@input$merged_heldout,  col_types = crispr_cols)
+```
+
+***
+
+## Functional classes
+Plot the proportion of the different functional classes after downsampling.
+```{r, fig.height=5, fig.width=6}
+# combined training and heldout crispr data into one table
+crispr <- bind_rows(Training = crispr_training, `Held-out` = crispr_heldout, .id = "dataset")
+
+# calculate overall proportions between datasets
+prop_classes <- crispr %>% 
+  count(dataset, element_category, name = "pairs", .drop = FALSE) %>% 
+  group_by(dataset) %>% 
+  mutate(total_pairs = sum(pairs),
+         prop_pairs = pairs / total_pairs) %>% 
+  ungroup()
+
+# create labels including total number of E-G pairs for each dataset & Regulated combination
+prop_classes <- mutate(prop_classes, label = paste0(dataset, "\nn=", total_pairs))
+
+# make element categories an ordered factor to arrange them properly in the plot
+categories <- c("CTCF overlap", "H3K27me3 overlap", "H3K27ac high", "H3K27ac medium", "H3K27ac low")
+prop_classes <- prop_classes %>% 
+  mutate(element_category = factor(element_category, levels = categories))
+
+# define colors for all element categories
+cat_colors <- c("H3K27me3 overlap" = "#429130", "CTCF overlap" = "#49BCBC",
+                "H3K27ac high" = "#C5373D", "H3K27ac medium" = "#D9694A", "H3K27ac low" = "#EA9561")
+
+# plot proportions between training and full downsamples datasets
+p1 <- ggplot(filter(prop_classes, dataset != "Held-out (downsampled)"),
+             aes(x = fct_rev(label), y = prop_pairs, fill = element_category)) +
+  facet_wrap(~ "All CRISPR pairs") +
+  geom_bar(stat = "identity") +
+  labs(title = "Element proportions", fill = "Element category",
+       y = "Proportion E-G pairs", x = "Dataset") +
+  scale_fill_manual(values = cat_colors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# calculate proportions of functional classes between datasets and CRISPR positives vs. negatives
+prop_classes_reg <- crispr %>% 
+  count(dataset, Regulated, element_category, name = "pairs", .drop = FALSE) %>% 
+  group_by(dataset, Regulated) %>% 
+  mutate(total_pairs = sum(pairs),
+         prop_pairs = pairs / total_pairs) %>% 
+  ungroup() %>% 
+  mutate(element_category = factor(element_category, levels = categories))
+
+# create a postive/negative string based on Regulated column and create label for plot
+prop_classes_reg <- prop_classes_reg %>% 
+  mutate(result = if_else(Regulated == TRUE, true = "CRISPR Positives",
+                          false = "CRISPR Negatives")) %>% 
+  mutate(label = paste0(dataset, "\nn=", total_pairs))
+
+# plot the proportions of functional classes in training and downsampled held-out data
+p2 <- ggplot(filter(prop_classes_reg, dataset != "Held-out (full)"),
+       aes(x = fct_rev(label), y = prop_pairs, fill = element_category)) +
+  facet_wrap(~result, scales = "free", drop = TRUE) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Element category", y = "Proportion E-G pairs", x = "Dataset") +
+  scale_fill_manual(values = cat_colors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r, fig.width=8, fig.height=4.5}
+# arrange proportion plots in one figure
+plot_grid(p1, p2, nrow = 1, rel_widths = c(0.4, 1), align = "h")
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/sup_crispr_note_fig1.2_heldout_proportions.pdf",
+       height = 4.5, width = 8)
+```
+
+Make plots for experiments in indirect effects corrected benchmarks.
+```{r}
+# combined training and heldout crispr data into one table
+use_datasets <- c("K562_DC_TAP", "WTC11_DC_TAP", "Klann", "Xie", "Gasperini2019")
+crispr_filt <- filter(crispr, Dataset %in% use_datasets)
+ 
+# calculate overall proportions between datasets
+prop_classes <- crispr_filt %>% 
+  count(dataset, element_category, name = "pairs", .drop = FALSE) %>% 
+  group_by(dataset) %>% 
+  mutate(total_pairs = sum(pairs),
+         prop_pairs = pairs / total_pairs) %>% 
+  ungroup()
+
+# create labels including total number of E-G pairs for each dataset & Regulated combination
+prop_classes <- mutate(prop_classes, label = paste0(dataset, "\nn=", total_pairs))
+
+# make element categories an ordered factor to arrange them properly in the plot
+categories <- c("CTCF overlap", "H3K27me3 overlap", "H3K27ac high", "H3K27ac medium", "H3K27ac low")
+prop_classes <- prop_classes %>% 
+  mutate(element_category = factor(element_category, levels = categories))
+
+# plot proportions between training and full downsamples datasets
+p1 <- ggplot(filter(prop_classes, dataset != "Held-out (downsampled)"),
+             aes(x = fct_rev(label), y = prop_pairs, fill = element_category)) +
+  facet_wrap(~ "All CRISPR pairs") +
+  geom_bar(stat = "identity") +
+  labs(title = "Element proportions", fill = "Element category",
+       y = "Proportion E-G pairs", x = "Dataset") +
+  scale_fill_manual(values = cat_colors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r}
+# calculate proportions of functional classes between datasets and CRISPR positives vs. negatives
+prop_classes_reg <- crispr_filt %>% 
+  count(dataset, Regulated, element_category, name = "pairs", .drop = FALSE) %>% 
+  group_by(dataset, Regulated) %>% 
+  mutate(total_pairs = sum(pairs),
+         prop_pairs = pairs / total_pairs) %>% 
+  ungroup() %>% 
+  mutate(element_category = factor(element_category, levels = categories))
+
+# create a postive/negative string based on Regulated column and create label for plot
+prop_classes_reg <- prop_classes_reg %>% 
+  mutate(result = if_else(Regulated == TRUE, true = "CRISPR Positives",
+                          false = "CRISPR Negatives")) %>% 
+  mutate(label = paste0(dataset, "\nn=", total_pairs))
+
+# plot the proportions of functional classes in training and downsampled held-out data
+p2 <- ggplot(filter(prop_classes_reg, dataset != "Held-out (full)"),
+       aes(x = fct_rev(label), y = prop_pairs, fill = element_category)) +
+  facet_wrap(~result, scales = "free", drop = TRUE) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Element category", y = "Proportion E-G pairs", x = "Dataset") +
+  scale_fill_manual(values = cat_colors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+```{r, fig.width=8, fig.height=4.5}
+# arrange proportion plots in one figure
+plot_grid(p1, p2, nrow = 1, rel_widths = c(0.4, 1), align = "h")
+```
+
+***
+
+## Precision at threshold
+
+### Plot precision
+Plot precision at threshold for available models on the training data and held out data to compare
+model performance on unseen CRISPR data.
+```{r, extractPerformance}
+# get models available for both the training and held out CRISPR data
+models <- intersect(perf_training$pred_uid, perf_heldout$pred_uid)
+
+# get performance metrics for these models on training data benchmark
+perf_training_threshold <- perf_training %>% 
+  filter(pred_uid %in% models) %>% 
+  select(pred_name_long, AUPRC, AUPRC_lowerCi, AUPRC_upperCi, PrecThresh = PrecMinSens,
+         PrecThresh_lowerCi = PrecMinSens_lowerCi, PrecThresh_upperCi = PrecMinSens_upperCi,
+         RecallThresh = RecallMinSens, RecallThresh_lowerCi = RecallMinSens_lowerCi,
+         RecallThresh_upperCi = RecallMinSens_upperCi)
+
+# get performance metrics for these models on combined held out data benchmark
+perf_heldout_threshold <- perf_heldout %>% 
+  filter(pred_uid %in% models, cell_type == "combined") %>% 
+  select(pred_name_long, AUPRC, AUPRC_lowerCi, AUPRC_upperCi, PrecThresh, PrecThresh_lowerCi,
+         PrecThresh_upperCi, RecallThresh, RecallThresh_lowerCi, RecallThresh_upperCi)
+
+# combine into one table
+perf_threshold <- bind_rows(Training = perf_training_threshold, `Held-out` = perf_heldout_threshold,
+                            .id = "crispr_dataset")
+
+# make predictor name a factor ordered by performance on training data
+pred_order <- pull(arrange(perf_training_threshold, PrecThresh), pred_name_long)
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+```
+
+```{r makePrecisionPlot, fig.width=8, fig.height=4}
+# get colors for all models to plot
+pred_colors <- pred_config %>% 
+  filter(pred_uid %in% models) %>% 
+  select(pred_name_long, color) %>% 
+  deframe()
+
+# plot precision for each predictor both on the training and the held-out CRISPR data 
+ggplot(perf_threshold, aes(y = pred_name_long, x = PrecThresh, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = PrecThresh_lowerCi, xmax = PrecThresh_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Predicting CRISPR links\nHeld-out test datasets", x = "Precision",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/main_fig2d_crispr_performance_heldout.pdf",
+       height = 4, width = 8)
+```
+
+### Calculate significance
+Bootstrapping is used to calculate the significance between precision on the two different datasets.
+```{r bootstrapSignificancePrecision, eval=FALSE}
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_training <- processMergedData(merged_training, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE)
+
+merged_heldout <- processMergedData(merged_heldout, pred_config = pred_config,
+                                    filter_valid_connections = TRUE,
+                                    include_missing_predictions = TRUE)
+
+# only retain data on models to compare
+pred_config <- filter(pred_config, pred_uid %in% models)
+merged_training <- filter(merged_training, pred_uid %in% models)
+merged_heldout <- filter(merged_heldout, pred_uid %in% models)
+
+# convert merged data for bootstrapping
+merged_training_bs <- convertMergedForBootstrap(merged_training, pred_config = pred_config)
+merged_heldout_bs  <- convertMergedForBootstrap(merged_heldout,  pred_config = pred_config)
+
+# get thresholds to compute performance
+thresholds <- getThresholdValues(pred_config, threshold_col = "alpha")
+
+# compute bootstrapped performance differences for all models between training and held-out data
+delta_prec <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs, 
+                                                metric = "precision", thresholds = thresholds)
+
+# plot bootstrapped delta confidence intervals
+plotBootstrappedIntervals(delta_prec)
+```
+
+```{r precisionSignificanceValues, eval=FALSE}
+# print table containing performance difference results from bootstrap analysis
+datatable(delta_prec, rownames = FALSE, extensions = "FixedColumns", 
+          options = list(fixedColumns = list(leftColumns = 1)))
+
+# save test results to file
+write_tsv(delta_prec,
+          file = "results/manuscript/tables/main_fig2d_precision_comparison_between_datasets.tsv")
+```
+
+***
+
+## Recall
+Plot recall at threshold for available models on the training data and held out data to compare
+model performance on unseen CRISPR data.
+```{r makeRecallPlot, fig.width=8, fig.height=4}
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+ggplot(perf_threshold, aes(y = pred_name_long, x = RecallThresh, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = RecallThresh_lowerCi, xmax = RecallThresh_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Predicting CRISPR links\nHeld-out test datasets", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+### Calculate significance
+Bootstrapping is used to calculate the significance between recall on the two different datasets.
+```{r bootstrapSignificanceRecall, eval=FALSE}
+# compute bootstrapped performance differences for all models between training and held-out data
+delta_recall <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs, 
+                                                  metric = "recall", thresholds = thresholds)
+
+# print table containing performance difference results from bootstrap analysis
+datatable(delta_recall, rownames = FALSE, extensions = "FixedColumns", 
+          options = list(fixedColumns = list(leftColumns = 1)))
+```
+
+***
+
+## AUPRC
+
+### Plot AUPRC
+Plot AUPRC for available models on the training data and held out data to compare
+model performance on unseen CRISPR data.
+```{r makeAUPRCPlot, fig.width=8, fig.height=4}
+# plot AUPRC for each predictor both on the training and the held-out CRISPR data 
+ggplot(perf_threshold, aes(y = pred_name_long, x = AUPRC, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = AUPRC_lowerCi, xmax = AUPRC_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Predicting CRISPR links\nHeld-out test datasets", x = "AUPRC",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+### Calculate significance
+Bootstrapping is used to calculate the significance between AUPRC on the two different datasets.
+```{r bootstrapSignificanceAUPRC, eval=FALSE}
+# compute bootstrapped performance differences for all models between training and held-out data
+delta_auprc <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs, 
+                                                 metric = "auprc")
+
+# print table containing performance difference results from bootstrap analysis
+datatable(delta_auprc, rownames = FALSE, extensions = "FixedColumns", 
+          options = list(fixedColumns = list(leftColumns = 1)))
+```
+
+***
+
+
+## False negatives
+Investigate properties of CRISPR positives that do not pass the ENCODE-rE2G threshold and lead to
+low recall.
+
+### Element categories of false negatives
+Compare proportions of element categories of false negatives vs. true positives.
+```{r, fig.height=4, fig.width=5}
+# predictor score thresholds
+e2g_threshold <- pull(filter(pred_config, pred_uid == "ENCODE_rE2G.Score"), "alpha")
+
+# combine merged data for training and heldout datasets
+merged <- bind_rows(Training = merged_training, `Held-out` = merged_heldout, .id = "Dataset")
+
+# extract CRISPR positives including ENCODE-rE2G scores and label whether E-G pairs are true
+# positives or false negatives based on whether ENCODE-rE2G score is above threshold or not
+crispr_positives <- merged %>% 
+  filter(pred_uid == "ENCODE_rE2G.Score", Regulated == TRUE) %>% 
+  mutate(Type = if_else(pred_value >= e2g_threshold, true = "True positive",
+                        false = "False negative"))    
+
+# calculate the proportions of element classes for true positives and false negatives
+prop_classes_crispr_positives <- crispr_positives %>% 
+  count(Dataset, Type, element_category, name = "pairs", .drop = FALSE) %>% 
+  group_by(Dataset, Type) %>% 
+  mutate(total_pairs = sum(pairs),
+         prop_pairs = pairs / total_pairs) %>% 
+  ungroup()
+
+# make element categories an ordered factor to arrange them properly in the plot and create label
+prop_classes_crispr_positives <- prop_classes_crispr_positives %>% 
+  mutate(element_category = factor(element_category, levels = categories)) %>% 
+  mutate(label = paste0(Type, "\nn=", total_pairs))
+
+# plot the proportion of element categories for true positives vs. false negatives
+ggplot(prop_classes_crispr_positives, aes(x = label, y = prop_pairs, fill = element_category)) +
+  facet_wrap(~ Dataset, scales = "free", drop = TRUE) +
+  geom_bar(stat = "identity") +
+  labs(fill = "Element category", y = "Proportion E-G pairs") +
+  scale_fill_manual(values = cat_colors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+In both the Training and held-out CRISPR data, ENCODE-rE2G misses the CTCF sites, which is expected.
+False negatives have a higher proportion of elements with low H3K27ac in both datasets, indicating
+that the model might miss lowly acetylated enhancers, i.e. weak enhancers.
+
+### H3K27ac activity vs. distance
+```{r}
+# get distance to TSS for all crispr E-G pairs
+crispr_distToTSS <- merged %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  select(Dataset, name, distToTSS = pred_value) %>% 
+  distinct()
+
+# add distance to crispr positives table
+crispr_positives <- left_join(crispr_positives, crispr_distToTSS, by = c("Dataset", "name"))
+
+# convert to long format for some plots
+crispr_positives_lf <- crispr_positives %>% 
+  mutate(`Dist. TSS (kb)` = distToTSS / 1000) %>% 
+  select(Dataset, name, Type, `Effect size` = EffectSize, `Dist. TSS (kb)`, `DNase (RPM)` = DHS.RPM,
+         `H3K27ac (RPM)` = H3K27ac.RPM) %>% 
+  pivot_longer(cols = c(`Effect size`, `Dist. TSS (kb)`, `DNase (RPM)`, `H3K27ac (RPM)`),
+               names_to = "feature", values_to = "value") %>% 
+  mutate(feature = fct_relevel(feature, "Dist. TSS (kb)", "H3K27ac (RPM)"))
+```
+
+```{r}
+# plot distance vs. H3K27ac for crispr positives from training dataset
+p1 <- ggplot(filter(crispr_positives, Dataset == "Training"),
+                    aes(x = distToTSS / 1000, y = H3K27ac.RPM, color = Type)) +
+  geom_point() +
+  labs(title = "Combined training CRISPR data", x = "Distance to TSS (kb)", y = "H3K27ac (RPM)") +
+  scale_color_manual(values = c(`True positive` = "steelblue", `False negative` = "red3")) +
+  theme_classic()  +
+  theme(legend.position = "none")
+
+# add marginal histograms
+p1 <- ggMarginal(p1, type = "density", groupColour = TRUE)
+
+# plot features as boxplots
+p2 <- ggplot(filter(crispr_positives_lf, Dataset == "Training"),
+             aes(x = Type, y = value, color = Type)) +
+  facet_wrap(~feature, nrow = 1, scales = "free") +
+  geom_jitter(width = 0.33) +
+  geom_boxplot(color = "black", width = 0.5, fill = NA, outlier.shape = NA) +
+  scale_color_manual(values = c(`True positive` = "steelblue", `False negative` = "red3")) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+# arrange plots for training data in one figure
+training_plots <- plot_grid(p1, p2, nrow = 1, rel_widths = c(1, 1.4))
+```
+
+```{r}
+# plot distance vs. H3K27ac for crispr positives from heldout dataset
+p1 <- ggplot(filter(crispr_positives, Dataset == "Held-out"),
+                    aes(x = distToTSS / 1000, y = H3K27ac.RPM, color = Type)) +
+  geom_point() +
+  labs(title = "Combined heldout CRISPR data", x = "Distance to TSS (kb)", y = "H3K27ac (RPM)") +
+  scale_color_manual(values = c(`True positive` = "steelblue", `False negative` = "red3")) +
+  theme_classic()  +
+  theme(legend.position = "none")
+
+# add marginal histograms
+p1 <- ggMarginal(p1, type = "density", groupColour = TRUE)
+
+# plot features as boxplots
+p2 <- ggplot(filter(crispr_positives_lf, Dataset == "Held-out"),
+             aes(x = Type, y = value, color = Type)) +
+  facet_wrap(~feature, nrow = 1, scales = "free") +
+  geom_jitter(width = 0.33) +
+  geom_boxplot(color = "black", width = 0.5, fill = NA, outlier.shape = NA) +
+  scale_color_manual(values = c(`True positive` = "steelblue", `False negative` = "red3")) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        strip.text=element_text(size = 10), axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+# arrange plots for training data in one figure
+heldout_plots <- plot_grid(p1, p2, nrow = 1, rel_widths = c(1, 1.4))
+```
+
+```{r, fig.height=7, fig.width=13}
+# combine into one figure
+plot_grid(training_plots, heldout_plots, ncol = 1)
+```
+
+ENCODE-rE2G misses predominantly distal enhancers with low H3K27ac (and DNase-seq) in both the
+training and held-out CRISPR datasets. These results suggest that ENCODE-rE2G behaves similarly on
+both benchmarks, with the difference, that the held-out CRISPSR data contains more enhancers with
+low H3K27ac / DNase-seq.
+
+### H3K37ac and DNase-seq distributions
+Plot and compare H3K27ac and DNase-seq signal distributions of CRISPR positives between training and
+held-out CRISPR data.
+```{r, fig.width=10, fig.height=4}
+# make H3K27ac RPM ECDF plot
+p1 <- ggplot(crispr_positives, aes(x = H3K27ac.RPM, color = Dataset)) +
+  stat_ecdf(size = 0.75) +
+  labs(x = "H3K27ac (RPM)", title = "H3K27ac signal (CRISPR positives only)") +
+  scale_color_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  theme_bw()
+
+# make DNase RPM ECDF plot
+p2 <- ggplot(crispr_positives, aes(x = DHS.RPM, color = Dataset)) +
+  stat_ecdf(size = 0.75) +
+  labs(x = "DNase (RPM)", title = "DNase signal (CRISPR positives only)") +
+  scale_color_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  theme_bw()
+
+# combine plots into one figure
+plot_grid(p1 + theme(legend.position = "none"),
+          p2, rel_widths = c(0.8, 1), nrow = 1)
+```
+
+### Median H3K37ac, DNase-seq and CRISPR effect size
+Compare DNase-seq, H3K27ac and effect sizes of CRISPR positives between training and held-out
+datasets using boxplots.
+```{r, fig.width=8, fig.height=3}
+ggplot(filter(crispr_positives_lf, feature != "Dist. TSS (kb)"),
+       aes(x = Dataset, y = value, fill = Dataset)) +
+  facet_wrap(~feature, scales = "free", nrow = 1) +
+  geom_violin() +
+  geom_boxplot(color = "black", fill = NA, outlier.shape = NA, width = 0.15) +
+  scale_fill_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  theme_bw()
+```
+
+Show effect size distribution per experimental dataset.
+```{r}
+# get relevant data per experimental dataset (valid enhancers only)
+crispr_positive_datasets <- crispr_positives %>% 
+  filter(!element_category %in% c("CTCF overlap", "H3K27me3 overlap")) %>% 
+  mutate(`Dist. TSS (kb)` = distToTSS / 1000) %>% 
+  select(Dataset, Reference, name, Type, element_category, `Effect size` = EffectSize,
+         `Dist. TSS (kb)`, `DNase (RPM)` = DHS.RPM, `H3K27ac (RPM)` = H3K27ac.RPM) %>% 
+  pivot_longer(cols = c(`Effect size`, `Dist. TSS (kb)`, `DNase (RPM)`, `H3K27ac (RPM)`),
+               names_to = "feature", values_to = "value")
+
+# create source based in reference (combine Fulco 2019 supplemented into one category)
+nasser_supp_training <- c("Ulirsch2016", "Wakabayashi2016", "Klann2017", "Thakore2015", "Xie2017",
+                        "Qi2018", "Huang2018", "Xu2015")
+nasser_supp_heldout <- c("Mumbach et al., 2017", "Tewhey et al., 2016")
+crispr_positive_datasets <- crispr_positive_datasets %>% 
+  mutate(Source = case_when(
+    Reference %in% nasser_supp_training ~ "Nasser2021 supp. train.",
+    Reference %in% nasser_supp_heldout ~ "Nasser2021 supp. held-out",
+    is.na(Reference) ~ "NA",
+    TRUE ~ Reference
+  ))
+
+# get number of positives per experimental dataset
+n_positives <- crispr_positive_datasets %>% 
+  select(name, Source) %>% 
+  distinct() %>% 
+  count(Source, name = "n_positives") %>% 
+  replace_na(list(Source = "NA"))
+
+# add number of positives to source label
+crispr_positive_datasets <- crispr_positive_datasets %>% 
+  left_join(n_positives, by = "Source") %>% 
+  mutate(Source = paste0(Source, " (n=", n_positives, ")"))
+
+# make source a factor, ordered by whether it's part of the training or held-out data
+crispr_positive_datasets <- crispr_positive_datasets %>% 
+  mutate(Source = fct_reorder(Source, as.numeric(as.factor(crispr_positive_datasets$Dataset)),
+                              .desc = TRUE))
+
+# make element categories a factor
+crispr_positive_datasets <- crispr_positive_datasets %>% 
+  mutate(element_category = factor(element_category,
+                                   levels = c("H3K27ac low", "H3K27ac medium", "H3K27ac high")))
+```
+
+```{r, fig.height=4, fig.width=7}
+# plot effect size distribution per experimental dataset
+ggplot(filter(crispr_positive_datasets, feature == "Effect size"),
+       aes(x = Source, y = value, color = Dataset)) +
+  geom_jitter(width = 0.2) +
+  geom_boxplot(width = 0.25, color = "black", fill = NA, outlier.shape = NA) +
+  labs(y = "CRISPR effect size\n(percent change)", color = "Dataset type",
+       title = "Effect sizes for CRISPR positives across datasets") +
+  scale_color_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.text = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+Make effect sizes plot filtered to used datasets.
+```{r, fig.height=4, fig.width=7}
+used_refs <- c("Gasperini et al., 2019", "K562_DC_TAP_Seq", "WTC11_DC_TAP_Seq",
+               "Klann et al., 2021", "Xie et al., 2019")
+
+crispr_pos_refs <- crispr_positive_datasets %>% 
+  filter(Reference %in% used_refs) %>% 
+  mutate(Reference = factor(Reference, levels = used_refs, ordered = TRUE)) %>% 
+  arrange(Reference) %>% 
+  mutate(Source = fct_inorder(Source))
+
+# plot effect size distribution per experimental dataset
+ggplot(filter(crispr_pos_refs, feature == "Effect size"),
+       aes(x = Source, y = value, color = Dataset)) +
+  geom_jitter(width = 0.2) +
+  geom_boxplot(width = 0.25, color = "black", fill = NA, outlier.shape = NA) +
+  labs(y = "CRISPR effect size\n(percent change)", color = "Dataset type",
+       title = "Effect sizes for CRISPR positives across datasets") +
+  scale_color_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.text = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+
+
+
+
+The Gasperini 2019 Perturb-seq data seems to be the main driver why effect sizes are lower in the
+Training data. This could be because 1) the high MOI screen mutes effect sizes and/or 2) the high
+number of cells per perturbation allows to detect very weak effects compared to the underpowered
+published datasets in the held-out datasets.
+
+Show effect size distribution per element category.
+```{r, fig.height=3.5, fig.width=8}
+# plot effect size distribution per experimental dataset
+ggplot(filter(crispr_positive_datasets, feature == "Effect size"),
+       aes(x = element_category, y = value, color = element_category)) +
+  facet_wrap(~ Dataset, nrow = 1, scales = "free", drop = TRUE) +
+  geom_jitter(width = 0.2) +
+  geom_boxplot(width = 0.25, color = "black", fill = NA, outlier.shape = NA) +
+  labs(y = "CRISPR effect size\n(percent change)", color = "Element category",
+       title = "Effect sizes for CRISPR positives across element categories") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+```
+
+Make plot for used datasets
+```{r, fig.height=6, fig.width=9}
+# plot effect size distribution per experimental dataset
+ggplot(filter(crispr_pos_refs, feature == "Effect size"),
+       aes(x = element_category, y = value, color = element_category)) +
+  facet_wrap(~Reference, scales = "free", drop = TRUE) +
+  geom_jitter(width = 0.2) +
+  geom_boxplot(width = 0.25, color = "black", fill = NA, outlier.shape = NA) +
+  labs(y = "CRISPR effect size\n(percent change)", color = "Element category",
+       title = "Effect sizes for CRISPR positives across element categories") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+
+
+
+The three "H3K27ac low" pairs with high effect sizes in the training data are from Wakabayashi2016
+respectively Xu2015 and were supplemented into the Nassser2021 dataset.
+
+```{r, fig.width=10, fig.height=4}
+# extract data in long format for features to plot and define breaks for binning RPM values
+crispr_pos_plot <- filter(crispr_positives_lf, feature %in% c("DNase (RPM)", "H3K27ac (RPM)"))
+rpm_steps <- 5
+rpm_bins <- seq(from = 0, to = max(crispr_pos_plot$value) + rpm_steps, by = rpm_steps)
+
+# bin each pair into a DNase and H3K27ac RPM bin and count number of pairs per bin
+crispr_pos_bins <- crispr_pos_plot %>% 
+  mutate(bin = cut(value, breaks = rpm_bins, include.lowest = TRUE)) %>% 
+  count(Dataset, feature, bin, name = "pairs")
+
+# calculate the percentage of pairs in each bin
+crispr_pos_bins <- crispr_pos_bins %>% 
+  group_by(Dataset, feature) %>% 
+  mutate(perc_pairs  = pairs / sum(pairs))
+
+# plot the percentage of CRISPR E-G pairs per DNase or H3K27ac RPM bin
+ggplot(crispr_pos_bins, aes(x = bin, y = perc_pairs, fill = Dataset)) +
+  facet_wrap(~ feature, scales = "free", drop = TRUE) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "RPM", y = "Percentage of E-G pairs") +
+  scale_fill_manual(values = c(Training = "skyblue", `Held-out` = "goldenrod2")) +
+  scale_y_continuous(labels = scales::percent) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), strip.background = element_blank(),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+### Create genome browser tracks
+Create .bedpe files to use in genome browser to visualize false negative CRISPR E-G pairs in
+training and held-out datasets.
+```{r, eval=FALSE}
+# extract false negatives and create all .bedpe columns
+fn_bedpe <- crispr_positives %>% 
+  filter(Type == "False negative") %>% 
+  mutate(strand1 = ".", strand2 = ".") %>% 
+  select(Dataset, ExperimentCellType, chrom1 = chrom, start1 = chromStart, end1 = chromEnd,
+         chrom2 = chrTSS, start2 = startTSS, end2 = endTSS, name, score = pred_value, strand1,
+         strand2)
+
+# split by dataset
+fn_bedpe <- split(fn_bedpe[, -1], f = fn_bedpe$Dataset)
+
+# split held-out data by cell type
+fn_bedpe <- lapply(fn_bedpe, FUN = function(x) split(x[, -1], f = x$ExperimentCellType))
+
+# save false negatives to .bedpe files
+output_dir <- "results/additional_analyses/heldout_crispr_data"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+for (dataset in names(fn_bedpe)) {
+  pairs <- fn_bedpe[[dataset]]
+  for(cell_type in names(pairs)) {
+    output_file <- file.path(output_dir, paste0(dataset, "_", cell_type, ".bedpe"))
+    write_tsv(pairs[[cell_type]], file = output_file, col_names = FALSE)
+  }
+}
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

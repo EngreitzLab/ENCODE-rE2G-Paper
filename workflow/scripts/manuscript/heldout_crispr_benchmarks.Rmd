@@ -1,0 +1,651 @@
+---
+title: "Heldout CRISPR data benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# save.image("heldout_crispr.rda")
+# stop()
+
+# set output html chunk options
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Perform CRISPR benchmarking analyses on held-out data.
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(DT)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+***
+
+## Load and process input data
+Load and process output from CRISPR benchmarking pipeline.
+```{r prepareData}
+# load indirect effects summary table
+indirect_effects <- read_tsv(snakemake@input$indirect_effects, show_col_types = FALSE)
+
+# load performance summary tables
+perf_training <- read_tsv(snakemake@input$perf_training, show_col_types = FALSE)
+perf_heldout <- read_tsv(snakemake@input$perf_heldout, show_col_types = FALSE)
+
+# load crispr data files
+merged_training <- read_tsv(snakemake@input$merged_training, show_col_types = FALSE)
+merged_heldout <- read_tsv(snakemake@input$merged_heldout, show_col_types = FALSE)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = FALSE,
+                                include_col = "crispr_main_benchmarks")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_training <- processMergedData(merged_training, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE)
+
+merged_heldout <- processMergedData(merged_heldout, pred_config = pred_config,
+                                    filter_valid_connections = TRUE,
+                                    include_missing_predictions = TRUE)
+
+# get models available for both the training and held out CRISPR data
+models <- intersect(perf_training$pred_uid, perf_heldout$pred_uid)
+
+# only retain data on models to include in analyses
+perf_training <- filter(perf_training, pred_uid %in% models)
+perf_heldout <- filter(perf_heldout, pred_uid %in% models, cell_type == "combined")
+merged_training <- filter(merged_training, pred_uid %in% models)
+merged_heldout <- filter(merged_heldout, pred_uid %in% models)
+```
+
+***
+
+## Precision at threshold
+Plot precision at threshold for selected models on both the training and held-out CRISPR data.
+```{r getPerf}
+# get performance metrics for these models on training data benchmark
+perf_training_threshold <- perf_training %>% 
+  select(pred_name_long, AUPRC, AUPRC_lowerCi, AUPRC_upperCi, PrecThresh, PrecThresh_lowerCi,
+         PrecThresh_upperCi, RecallThresh, RecallThresh_lowerCi, RecallThresh_upperCi)
+
+# get performance metrics for these models on combined held out data benchmark
+perf_heldout_threshold <- perf_heldout %>% 
+  select(pred_name_long, AUPRC, AUPRC_lowerCi, AUPRC_upperCi, PrecThresh, PrecThresh_lowerCi,
+         PrecThresh_upperCi, RecallThresh, RecallThresh_lowerCi, RecallThresh_upperCi)
+
+# combine into one table
+perf_threshold <- bind_rows(Training = perf_training_threshold, `Held-out` = perf_heldout_threshold,
+                            .id = "crispr_dataset")
+
+# make predictor name a factor ordered by performance on training data
+pred_order <- pull(arrange(perf_training_threshold, PrecThresh), pred_name_long)
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+```
+
+```{r makePrecisionPlot, fig.width=8, fig.height=4}
+# add an additional fill group to the performance table
+perf_threshold <- perf_threshold %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+
+# get colors for all models to plot
+pred_colors <- pred_config %>% 
+  filter(pred_uid %in% models) %>% 
+  select(pred_name_long, color) %>% 
+  deframe()
+
+# get fill colors, which includes information on CRISPR dataset type
+fill_colors <- c(Training = NA_character_, pred_colors)
+
+# plot precision for each predictor both on the training and the held-out CRISPR data 
+ggplot(perf_threshold, aes(y = pred_name_long, x = PrecThresh, color = pred_name_long,
+                           fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = PrecThresh_lowerCi, xmax = PrecThresh_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Predicting CRISPR links\nHeld-out test datasets", x = "Precision",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/main_fig2d_crispr_performance_heldout.pdf",
+       height = 4, width = 8)
+```
+
+```{r}
+# convert merged data bootstrapping format
+merged_training_bs <- convertMergedForBootstrap(merged_training, pred_config = pred_config)
+merged_heldout_bs <- convertMergedForBootstrap(merged_heldout, pred_config = pred_config)
+
+# get thresholds for all predictors
+thresholds <- getThresholdValues(pred_config, threshold_col = "alpha")
+
+# compute bootstrapped Precision differences between training and held-out data
+delta_precision <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                     metric = "precision", thresholds = thresholds)
+```
+
+```{r}
+datatable(delta_precision)
+```
+
+***
+
+## Recall at threshold and AUPRC
+Plot recall at threshold for selected models on both the training and held-out CRISPR data.
+```{r otherPerfPlots, fig.width=10, fig.height=4}
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_recall <- ggplot(perf_threshold, aes(y = pred_name_long, x = RecallThresh, color = pred_name_long,
+                           fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = RecallThresh_lowerCi, xmax = RecallThresh_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Recall", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_auprc <- ggplot(perf_threshold, aes(y = pred_name_long, x = AUPRC, color = pred_name_long,
+                           fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = AUPRC_lowerCi, xmax = AUPRC_upperCi),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "AUPRC", x = "AUPRC",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# arrange plots into one figure
+plot_grid(
+  p_recall + theme(legend.position = "none"),
+  p_auprc + theme(axis.text.y = element_blank()),
+  rel_widths = c(0.89, 1),
+  scale = 0.95
+)
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/crispr_noteS1_crispr_performance_heldout.pdf",
+       height = 4, width = 10)
+```
+
+```{r}
+# compute bootstrapped Recall differences between training and held-out data
+delta_recall <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                     metric = "recall", thresholds = thresholds)
+
+datatable(delta_recall)
+```
+
+```{r}
+# compute bootstrapped AUPRC differences between training and held-out data
+delta_auprc <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                     metric = "auprc")
+
+datatable(delta_auprc)
+```
+
+
+***
+
+## Performance vs proportion indirect effects
+To show how the increased number expected indirect effects in held-out CRISPR datasets impacts
+ENCODE-rE2G model performance, the proportion of indirect (or direct) effects is plotted against
+AUPRC.
+```{r}
+rates_per_dataset <- indirect_effects %>% 
+  filter(effect_direction == "negative") %>% 
+  select(dataset, percent_indirect_cis_pairs) %>% 
+  mutate(percent_direct_cis_pairs = 1 - percent_indirect_cis_pairs)
+
+# TODO: IMPLEMENT THE REST OF THIS ANALYSIS HERE
+```
+
+***
+
+## Weighted performance
+Compute performance weighted by direct vs. indirect effects probability.
+```{r}
+# filter merged data for CRISPR data to include and convert to format for bootstrapping
+merged_training_bs <- merged_training %>% 
+  filter(!is.na(direct_vs_indirect_negative)) %>%
+  convertMergedForBootstrap(., pred_config = pred_config,
+                            weight_col = "direct_vs_indirect_negative")
+
+merged_heldout_bs <- merged_heldout %>% 
+  filter(!is.na(direct_vs_indirect_negative)) %>%
+  convertMergedForBootstrap(., pred_config = pred_config,
+                            weight_col = "direct_vs_indirect_negative")
+```
+
+### AUPRC
+Calculate AUPRC and weighted AUPRC:
+```{r}
+# calculate bootstrapped un-weighted AUPRC for selected training and heldout data
+unweighted_auprc_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "auprc")
+unweighted_auprc_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "auprc")
+
+# calculate weighted AUPRC for selected training and heldout data
+weighted_auprc_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "auprc",
+                                                         weighted = TRUE)
+weighted_auprc_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "auprc",
+                                                        weighted = TRUE)
+
+# predictor names to use in plots
+pred_names <- select(pred_config, id = pred_uid, pred_name_long)
+
+# combine into tables for plots
+unweighted_auprc <- bind_rows(Training = unweighted_auprc_training,
+                              `Held-out` = unweighted_auprc_heldout, .id = "crispr_dataset") %>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+
+weighted_auprc <- bind_rows(Training = weighted_auprc_training, `Held-out` = weighted_auprc_heldout,
+                            .id = "crispr_dataset")%>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+```
+
+```{r, fig.width=10, fig.height=4}
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_auprc_unweighted <- ggplot(unweighted_auprc, aes(y = pred_name_long, x = full,
+                                                   color = pred_name_long, fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "AUPRC", x = "AUPRC",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_auprc_weighted <- ggplot(weighted_auprc, aes(y = pred_name_long, x = full, color = pred_name_long,
+                                               fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Weighted AUPRC", x = "AUPRC",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# arrange plots into one figure
+plot_grid(
+  p_auprc_unweighted + theme(legend.position = "none"),
+  p_auprc_weighted + theme(axis.text.y = element_blank()),
+  rel_widths = c(0.89, 1),
+  scale = 0.95
+)
+```
+
+Calculate significance between training and heldout CRISPR data:
+```{r}
+# compute bootstrapped un-weighted AUPRC differences between training and held-out data
+unweighted_delta_auprc <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                            metric = "auprc")
+
+# compute bootstrapped weighted AUPRC differences between training and held-out data
+weighted_delta_auprc <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                          metric = "auprc", weighted = TRUE)
+```
+
+### Recall
+Calculate Recall and weighted Recall:
+```{r}
+# calculate unweighted recall for selected training and heldout data
+unweighted_recall_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "recall", 
+                                                            thresholds = thresholds)
+unweighted_recall_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "recall", 
+                                                           thresholds = thresholds)
+
+# calculate weighted recall for selected training and heldout data
+weighted_recall_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "recall", 
+                                                          thresholds = thresholds, weighted = TRUE)
+weighted_recall_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "recall", 
+                                                         thresholds = thresholds, weighted = TRUE)
+
+# combine into tables for plots
+unweighted_recall <- bind_rows(Training = unweighted_recall_training,
+                              `Held-out` = unweighted_recall_heldout, .id = "crispr_dataset") %>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+
+weighted_recall <- bind_rows(Training = weighted_recall_training, `Held-out` = weighted_recall_heldout,
+                            .id = "crispr_dataset")%>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+```
+
+```{r, fig.width=10, fig.height=4}
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_recall_unweighted <- ggplot(unweighted_recall, aes(y = pred_name_long, x = full,
+                                                    color = pred_name_long, fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Recall", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_recall_weighted <- ggplot(weighted_recall, aes(y = pred_name_long, x = full, color = pred_name_long,
+                                                 fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Weighted Recall", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# arrange plots into one figure
+plot_grid(
+  p_recall_unweighted + theme(legend.position = "none"),
+  p_recall_weighted + theme(axis.text.y = element_blank()),
+  rel_widths = c(0.89, 1),
+  scale = 0.95
+)
+```
+
+Calculate significance between training and heldout CRISPR data:
+```{r}
+# compute bootstrapped un-weighted AUPRC differences between training and held-out data
+unweighted_delta_recall <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                             metric = "recall",
+                                                             thresholds = thresholds, R = 1000)
+
+# compute bootstrapped weighted AUPRC differences between training and held-out data
+weighted_delta_recall <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                           metric = "recall",
+                                                           thresholds = thresholds, weighted = TRUE,
+                                                           R = 1000)
+```
+
+### Precision
+Calculate Precision and weighted Precision:
+```{r}
+# calculate unweighted precision for selected training and heldout data
+unweighted_precision_training <- bootstrapPerformanceIntervals(merged_training_bs,
+                                                               metric = "precision",
+                                                               thresholds = thresholds)
+unweighted_precision_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs,
+                                                              metric = "precision",
+                                                              thresholds = thresholds)
+
+# calculate weighted precision for selected training and heldout data
+weighted_precision_training <- bootstrapPerformanceIntervals(merged_training_bs,
+                                                             metric = "precision",
+                                                             thresholds = thresholds,
+                                                             weighted = TRUE)
+weighted_precision_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs,
+                                                            metric = "precision",
+                                                            thresholds = thresholds,
+                                                            weighted = TRUE)
+
+# combine into tables for plots
+unweighted_precision <- bind_rows(Training = unweighted_precision_training,
+                                  `Held-out` = unweighted_precision_heldout,
+                                  .id = "crispr_dataset") %>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+
+weighted_precision <- bind_rows(Training = weighted_precision_training,
+                                `Held-out` = weighted_precision_heldout,
+                                .id = "crispr_dataset")%>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+```
+
+```{r, fig.width=10, fig.height=4}
+# plot precision for each predictor both on the training and the held-out CRISPR data 
+p_precision_unweighted <- ggplot(unweighted_precision,
+                                 aes(y = pred_name_long, x = full, color = pred_name_long,
+                                     fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Precision", x = "Precision",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# plot precision for each predictor both on the training and the held-out CRISPR data 
+p_precision_weighted <- ggplot(weighted_precision,
+                               aes(y = pred_name_long, x = full, color = pred_name_long,
+                                   fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Weighted Precision", x = "Precision",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# arrange plots into one figure
+plot_grid(
+  p_precision_unweighted + theme(legend.position = "none"),
+  p_precision_weighted + theme(axis.text.y = element_blank()),
+  rel_widths = c(0.89, 1),
+  scale = 0.95
+)
+```
+
+Calculate significance between training and heldout CRISPR data:
+```{r}
+# compute bootstrapped un-weighted Precision differences between training and held-out data
+unweighted_delta_precision <- bootstrapDeltaPerformanceDatasets(merged_training_bs,
+                                                                merged_heldout_bs,
+                                                                metric = "precision",
+                                                                thresholds = thresholds, R = 1000)
+
+# compute bootstrapped weighted Precision differences between training and held-out data
+weighted_delta_precision <- bootstrapDeltaPerformanceDatasets(merged_training_bs,
+                                                              merged_heldout_bs,
+                                                              metric = "precision",
+                                                              thresholds = thresholds,
+                                                              weighted = TRUE,
+                                                              R = 1000)
+```
+
+***
+
+## Performace at predicting canonical enhancers
+
+### Weighted performance on canonical enhancers
+Compute performance on canonical enhancers defined as "H3K27ac medium" and "H3K27ac high" sites with
+at least a 10% CRISPR effect size on expression.
+```{r}
+# set CTCF and H3K27me3 sites to Regulated == FALSE
+non_enh <- c("CTCF overlap", "H3K27me3 overlap")
+merged_training_filt <- merged_training %>%
+  mutate(Regulated = if_else(element_category %in% non_enh, true = FALSE, false = Regulated))
+merged_heldout_filt <- merged_heldout %>%
+  mutate(Regulated = if_else(element_category %in% non_enh, true = FALSE, false = Regulated))
+
+# # hard filter for any non-enhancer elements
+# merged_training_filt <- filter(merged_training, !element_category %in% non_enh)
+# merged_heldout_filt <- filter(merged_heldout, !element_category %in% non_enh)
+
+# filter based on H3K27ac and CRISPR effect size
+merged_training_filt <- merged_training_filt %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.1)))
+merged_heldout_filt <- merged_heldout_filt %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.1)))
+
+# filter merged data for CRISPR data to include and convert to format for bootstrapping
+merged_training_bs <- merged_training_filt %>% 
+  filter(!is.na(direct_vs_indirect_negative)) %>%
+  convertMergedForBootstrap(., pred_config = pred_config,
+                            weight_col = "direct_vs_indirect_negative")
+
+merged_heldout_bs <- merged_heldout_filt %>% 
+  filter(!is.na(direct_vs_indirect_negative)) %>%
+  convertMergedForBootstrap(., pred_config = pred_config,
+                            weight_col = "direct_vs_indirect_negative")
+```
+
+```{r}
+# calculate weighted AUPRC for selected training and heldout data
+weighted_auprc_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "auprc",
+                                                         weighted = TRUE)
+weighted_auprc_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "auprc",
+                                                        weighted = TRUE)
+
+# calculate weighted Recall for selected training and heldout data
+weighted_recall_training <- bootstrapPerformanceIntervals(merged_training_bs, metric = "recall",
+                                                         thresholds = thresholds, weighted = TRUE)
+weighted_recall_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs, metric = "recall",
+                                                         thresholds = thresholds, weighted = TRUE)
+
+# combine into table for plots
+weighted_auprc <- bind_rows(Training = weighted_auprc_training,
+                              `Held-out` = weighted_auprc_heldout, .id = "crispr_dataset") %>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+
+weighted_recall <- bind_rows(Training = weighted_recall_training,
+                              `Held-out` = weighted_recall_heldout, .id = "crispr_dataset") %>% 
+  left_join(pred_names, by = "id") %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE)) %>% 
+  mutate(fill_group = if_else(crispr_dataset == "Held-out", true = pred_name_long,
+                              false = "Training"))
+```
+
+```{r, fig.width=10, fig.height=4}
+# plot AUPRC for each predictor both on the training and the held-out CRISPR data 
+p_auprc_weighted <- ggplot(weighted_auprc, aes(y = pred_name_long, x = full,
+                                                    color = pred_name_long, fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Weighted AUPRC", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# plot recall for each predictor both on the training and the held-out CRISPR data 
+p_recall_weighted <- ggplot(weighted_recall, aes(y = pred_name_long, x = full, color = pred_name_long,
+                                                 fill = fill_group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black", alpha = 1) +
+  labs(title = "Weighted Recall", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = fill_colors, na.value = NA) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+
+# arrange plots into one figure
+plot_grid(
+  p_auprc_weighted + theme(legend.position = "none"),
+  p_recall_weighted + theme(axis.text.y = element_blank()),
+  rel_widths = c(0.89, 1),
+  scale = 0.95
+)
+
+ggsave("results/manuscript/plots/heldout_weighted_performance.pdf", width = 10, height = 4)
+```
+
+Calculate significance between training and heldout CRISPR data:
+```{r}
+# compute bootstrapped weighted AUPRC differences between training and held-out data
+weighted_delta_auprc <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                             metric = "auprc", weighted = TRUE, R = 1000)
+
+# compute bootstrapped weighted Recall differences between training and held-out data
+weighted_delta_recall <- bootstrapDeltaPerformanceDatasets(merged_training_bs, merged_heldout_bs,
+                                                           metric = "recall",
+                                                           thresholds = thresholds, weighted = TRUE, R = 1000)
+```
+
+```{r}
+datatable(weighted_delta_auprc)
+```
+
+```{r}
+datatable(weighted_delta_recall)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

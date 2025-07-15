@@ -1,0 +1,506 @@
+---
+title: "Fig1b PRKAR2B locus"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# save.image("test.rda")
+# stop()
+
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Make genome browser style plot of the PRKAR2B locus showing ENCODE-rE2G predictions and features,
+and CRISPR hits.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages and functions
+library(Gviz)
+library(GenomicInteractions)
+library(rtracklayer)
+library(tidyverse)
+library(data.table)
+library(dendextend)
+```
+
+***
+
+## Load and prepare data
+Load and prepare any genome-wide data and define input files for data that will be loaded and
+processed for the selected locus.
+
+```{r locus}
+# locus coordinates and gene for which plot is made
+locus <- GRanges(seqnames = "chr7", ranges = IRanges(start = 106946937, end = 107092053),
+                 name = "PRKAR2B")
+```
+
+```{r genomeAnnot}
+# import gtf file containing genome annotations
+annot <- import(snakemake@input$genome_annot, format = "gtf")
+
+# extract annotations on protein-coding genes and lincRNAs exons
+genes <- annot[annot$type == "exon" &
+                 annot$gene_type %in% c("protein_coding", "lincRNA") & 
+                 annot$transcript_type %in% c("protein_coding", "lincRNA")]
+
+# create data frame containing required gene annotation data
+genes <- genes %>% 
+  as.data.frame() %>%
+  select(chromosome = seqnames, start, end, width, strand, feature = gene_type, gene = gene_id,
+         exon = exon_id, transcript = transcript_id, symbol = gene_name)
+```
+
+```{r K562CRISPR}
+# load output from CRISPR benchmarking
+crispr_data <- fread(snakemake@input$crispr)
+
+# extract tested CRISPR E-G pairs
+crispr_pairs <- crispr_data %>% 
+  select(chr = chrom, start = chromStart, end = chromEnd, name, measuredGeneSymbol,
+         chrTSS, startTSS, endTSS, EffectSize, Regulated) %>% 
+  distinct()
+
+# extract unique tested crispr elements and create GRanges object
+crispr_elements <- crispr_pairs %>% 
+  select(chr, start, end) %>% 
+  distinct() %>% 
+  makeGRangesFromDataFrame()
+
+# make GRanges objects for all positive CRISPR enhancers and genes
+crispr_pos_pairs <- filter(crispr_pairs, Regulated == TRUE)
+crispr_pos_enh <- makeGRangesFromDataFrame(crispr_pos_pairs)
+crispr_pos_genes <- crispr_pos_pairs %>% 
+  mutate(tss = (startTSS + endTSS) / 2) %>% 
+  makeGRangesFromDataFrame(seqnames.field = "chrTSS", start.field = "tss", end.field = "tss")
+
+# combine them into an interaction object
+crispr_pos_int <- GenomicInteractions(crispr_pos_enh, crispr_pos_genes,
+                                      p.value = 1-abs(crispr_pos_pairs$EffectSize))
+crispr_pos_int$gene <- crispr_pos_pairs$measuredGeneSymbol
+```
+
+```{r loadE2gFunction}
+# function to load E2G file and create interaction object
+load_e2g_interactions <- function(e2g_file, pvalue_function = NULL, ...) {
+  
+  # load E2G file and create GRanges objects for predicted enhancers and genes
+  e2g <- fread(e2g_file)
+  e2g_enh <- makeGRangesFromDataFrame(e2g, seqnames.field = "#chr")
+  e2g_genes <- makeGRangesFromDataFrame(e2g, seqnames.field = "#chr", start.field = "TargetGeneTSS",
+                                        end.field = "TargetGeneTSS")
+  
+  # create interaction object including gene name and predicted E2G score
+  e2g_int <- GenomicInteractions(e2g_enh, e2g_genes, p.value = e2g$Score)
+  e2g_int$gene <- e2g$TargetGene
+  
+  # convert p-value (or other score) using provided function
+  if (!is.null(pvalue_function)) {
+    mcols(e2g_int)[["p.value"]] <- pvalue_function(mcols(e2g_int)[["p.value"]], ...)
+  }
+  
+  return(e2g_int)
+  
+}
+
+# transform ENCODE-rE2G score for plots
+scale_e2g_score <- function(x, threshold) {
+  1 - x - threshold
+}
+```
+
+```{r k562e2gLinks}
+# load E2G links
+k562_e2g <- load_e2g_interactions(snakemake@input$k562_e2g_links, pvalue_function = scale_e2g_score,
+                                  threshold = 0.201)
+k562_e2g_ext <- load_e2g_interactions(snakemake@input$k562_e2g_ext_links,
+                                      pvalue_function = scale_e2g_score, threshold = 0.336)
+```
+
+```{r assayData}
+# load DNase-seq peaks and create GRanges object
+k562_dhs <- fread(snakemake@input$k562_dhs_peaks)
+k562_dhs <- makeGRangesFromDataFrame(k562_dhs, seqnames.field = "V1", start.field = "V2",
+                                     end.field = "V3", starts.in.df.are.0based = TRUE)
+```
+
+***
+
+## Detailed locus plots
+
+Make detailed tracks of all E-G interactions for the gene locus in K562 and 3 related cell types.
+
+### K562 tracks
+Create tracks for K562 from ENCODE-rE2G models, CRISPR data and chromatin assays. 
+```{r genomeTracks}
+# make genes track
+genes_track <- GeneRegionTrack(genes, genome = "hg38", name = "Genes",
+                               transcriptAnnotation = "symbol", color = "#676767", fill = "#676767")
+
+# create chromosome ideogram and axis track
+chr_track <- IdeogramTrack(genome = "hg38", chromosome = locus$chr)
+axis_track <- GenomeAxisTrack()
+```
+
+```{r E2gTrackFunction}
+# make a E2G interaction track with custom colors
+make_e2g_track <- function(int, name, color, gene = NULL, plot.outside = FALSE) {
+  
+  # only retain interactions for specified gene
+  if (!is.null(gene)) {
+    int <- int[int$gene == gene]
+  }
+  
+  # make interaction track for Gviz and set display parameters
+  int_track <- InteractionTrack(int, name = name)
+  displayPars(int_track) <- list(col.interactions = color, col.anchors.line = color,
+                                 col.anchors.fill = color, plot.outside = plot.outside,
+                                 interaction.measure = "p.value", interaction.dimension = "width")
+  
+  return(int_track)
+  
+}
+```
+
+```{r K562e2gTracks}
+# ENCODE-rE2G and ENCODE-rE2G_Extended tracks
+k562_e2g_track <- make_e2g_track(k562_e2g, name = "ENCODE-rE2G", color = "#DC6464",
+                                 gene = locus$name)
+k562_e2g_ext_track <- make_e2g_track(k562_e2g_ext, color = "#9B241C", name = "ENCODE-rE2G_Extended",
+                                     gene = locus$name)
+
+# CRISPR positives
+crispr_pos_track <- make_e2g_track(crispr_pos_int, name = "CRISPRi positives", color = "black",
+                                   gene = locus$name)
+
+# track for all CRISPR tested elements
+crispr_elements_track <- AnnotationTrack(subsetByOverlaps(crispr_elements, locus), 
+                                         name = "CRISPRi tested elements", fill = "black",
+                                         col = "black")
+```
+
+```{r K562assayTracks}
+# K562 DNase-seq track
+k562_dnase_track <- DataTrack(range = snakemake@input$k562_dnase_bigwig, name = "DNase-seq",
+                              type = "polygon", fill.mountain = rep("steelblue", 2),
+                              col.mountain = "steelblue")
+
+# K562 H3K27ac track
+k562_h3k27ac_track <- DataTrack(range = snakemake@input$k562_h3k27ac_bigwig, name = "H3K27ac",
+                                type = "polygon", fill.mountain = rep("goldenrod", 2),
+                                col.mountain = "goldenrod")
+
+# K562 DHS track
+k562_dhs_track <- AnnotationTrack(subsetByOverlaps(k562_dhs, locus), name = "DHS",
+                                  fill = "steelblue", col = "steelblue")
+```
+
+### ENCODE-E2G links in key other cell types
+Make tracks for predicted ENCODE-rE2G E-G links and DNase-seq sigals in 3 K562 related cell types.
+```{r keyCellTypesFiles, include=FALSE}
+# load sample list for all ENCODE-rE2G predictions
+e2g_preds <- fread(snakemake@input$e2g_metadata)
+
+# get e2g predictions for other key cell types
+key_cell_types <- c("hematopoietic multipotent progenitor cell", "CMK", "HL-60")
+e2g_key_ct <- filter(e2g_preds, `Biosample term name` %in% key_cell_types, `ENCODE-rE2G v1` == TRUE)
+
+# download bigWig for these as temporary files
+bw_temp_files <- data.frame(
+  cell_type = e2g_key_ct$`Biosample term name`,
+  url = e2g_key_ct$dnase_bigwig_url,
+  destfile = file.path(tempdir(), basename(e2g_key_ct$dnase_bigwig_url))
+)
+mapply(bw_temp_files$url, bw_temp_files$destfile, FUN = download.file)
+```
+
+```{r keyCellTypesTracks}
+# get E2G scores for selected key cell types as interaction objects
+e2g_key_ct_pred_files <- e2g_key_ct %>% 
+  select(`Biosample term name`, thresholded_predictions_path) %>% 
+  deframe()
+e2g_key_ct_int <- lapply(e2g_key_ct_pred_files, FUN = load_e2g_interactions,
+                         pvalue_function = scale_e2g_score, threshold = 0.201)
+
+# make interaction tracks for E2G in selected key cell types
+e2g_key_ct_tracks <- lapply(structure(key_cell_types, names = key_cell_types), FUN = function(x) {
+  make_e2g_track(e2g_key_ct_int[[x]], name = x, color = "#DC6464", gene = locus$name)
+  })
+
+# make DNase-seq tracks for selected key cell types
+e2g_key_ct_dnase_files <- structure(bw_temp_files$destfile, names = bw_temp_files$cell_type)
+e2g_key_ct_dnase <- lapply(structure(key_cell_types, names = key_cell_types), FUN = function(x) {
+  DataTrack(e2g_key_ct_dnase_files[[x]], name = x, type = "polygon",
+            fill.mountain = rep("steelblue", 2), col.mountain = "steelblue")
+})
+
+# arrange all tracks in a list with ENCODE-rE2G and DNase-seq tracks for each cell type
+key_ct_tracks <- list()
+for (i in key_cell_types) {
+  key_ct_tracks <- c(key_ct_tracks, e2g_key_ct_tracks[[i]], e2g_key_ct_dnase[[i]])
+}
+```
+
+### Make detailed locus plot
+Plot detailed tracks for K562 and related cell types.
+```{r detailedLocusPlot}
+# combine all tracks into one list
+detailed_tracks <- c(chr_track, axis_track, genes_track, k562_e2g_track, k562_e2g_ext_track,
+                crispr_pos_track, crispr_elements_track, k562_h3k27ac_track, k562_dnase_track,
+                k562_dhs_track, key_ct_tracks)
+
+# relative heights for all tracks
+detailed_track_sizes <- c(0.5, 0.6, 0.3, 0.5, 0.5, 0.5, 0.15, 0.6, 0.6, 0.15,
+                          rep(c(0.3, 0.4), length(key_ct_tracks) / 2))
+
+# make plot
+pdf("results/manuscript/plots/main_fig1b_prkar2b_detailed_view.pdf", height = 6, width = 10)
+plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), sizes = detailed_track_sizes,
+           background.title = "transparent", col.axis = "black", fontcolor.title = "black",
+           fontface.title = 1, rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+dev.off()
+```
+
+***
+
+## ENCODDE-E2G across cell types
+
+Get ENCODE-rE2G prediction across many cell types to display in "heatmap" style to show below the
+more detailed links. This plot is produced for DNase-seq experiments with at least `min_enhancers`
+enhancers for the locus gene, both using all DNase-seq experiments and designated "default"
+experiments.
+```{r loadAllScores}
+# function to get links within a certain genomic region
+get_locus_links <- function(scores, chr, start, end) {
+  region <- GRanges(seqnames = chr, ranges = IRanges(start, end))
+  subsetByOverlaps(scores, ranges = region)
+}
+
+# load thresholded predictor scores or all biosamples
+pred_scores <- readRDS(snakemake@input$e2g_scores_gene)
+
+# filter scores for links with selected locus region if specified
+if (snakemake@params$filter_links_locus == TRUE) {
+  pred_scores <- endoapply(pred_scores, FUN = get_locus_links, chr = as.character(seqnames(locus)),
+                         start = start(locus), end = end(locus))
+}
+
+# get samples with more 3 or more enhancers
+n_enh <- vapply(pred_scores, FUN = length, FUN.VALUE = integer(1))
+score_samples <- names(n_enh)[n_enh >= snakemake@params$min_enhancers]
+
+# remove cell types that are part of the detailed view
+k562_sample <- sub("^.+predictions_(.+)_thresholded.+$", "\\1", snakemake@input$k562_e2g_links)
+score_samples <- setdiff(score_samples, c(k562_sample, e2g_key_ct$Sample))
+
+# extract scores for the selected samples
+pred_scores <- pred_scores[score_samples]
+
+# only retain DNase-seq experiments designated as default for given biosample-treatment combinations
+default_samples <- pull(filter(e2g_preds, `Default Sample` == TRUE), Sample)
+pred_scores_default <- pred_scores[intersect(names(pred_scores), default_samples)]
+```
+
+Number of samples (>= `r snakemake@params$min_enhancers` enhancers):
+
+- All samples considered: `r length(pred_scores)`
+- Default samples only: `r length(pred_scores_default)`
+
+### Cluster cell types based on scores in merged enhancer regions
+Cluster both DNase-seq experiment list based on scores in consensus enhancer regions defined by
+positional overlap.
+```{r clusterFunctions}
+# stupid function to get pred scores of predictions overlapping one merged enhancer
+get_overlapping_scores <- function(revmap, all_enhancers, all_samples) {
+  
+  # get scores of all enhancers overlapping given merged enhancer
+  scores <- mcols(all_enhancers[revmap])
+  
+  # aggregate scores if multiple enhancers from one sample overlap the merged enhancer
+  scores <- scores %>% 
+    as.data.frame() %>% 
+    rownames_to_column(var = "sample") %>% 
+    group_by(sample) %>% 
+    summarize(score = mean(score))
+  
+  # add score = 0 for all other samples without overlapping enhancers
+  scores <- all_samples %>% 
+    left_join(scores, by = "sample") %>% 
+    replace_na(replace = list(score = 0))
+
+  # convert to wide format for output
+  output <- pivot_wider(scores, names_from = sample, values_from = score)
+  
+  return(output)
+  
+}
+
+# cluster DNase-seq experiments based on merged predictive model scores
+cluster_dnase_experiments <- function(pred_scores) {
+  
+  # get all enhancers in all cell types for the given gene and merge overlapping enhancers
+  all_enhancers <- unlist(pred_scores)
+  merged_enhancers <- GenomicRanges::reduce(all_enhancers, with.revmap = TRUE)
+  
+  # add unique names to merged enhancers
+  names(merged_enhancers) <- paste0(seqnames(merged_enhancers), ":", start(merged_enhancers), "-",
+                                    end(merged_enhancers))
+  
+  # create data frame with sample names of all samples
+  all_samples <- tibble(sample = names(pred_scores))
+  
+  # get scores for all merged enhancers
+  revmap <- structure(as.list(merged_enhancers$revmap), names = names(merged_enhancers))
+  merged_scores <- lapply(revmap, FUN = get_overlapping_scores, all_enhancers = all_enhancers,
+                          all_samples = all_samples)
+  
+  # combine into one data frame
+  merged_scores <- bind_rows(merged_scores, .id = "merged_enhancer")
+  
+  # create matrix of scores for each merged enhancer
+  merged_scores <- merged_scores %>% 
+    column_to_rownames(var = "merged_enhancer") %>% 
+    as.matrix()
+  
+  # cluster cell types based on scores of merged enhancers
+  cluster_scores <- hclust(dist(t(merged_scores)))
+  
+  return(cluster_scores)
+  
+}
+```
+
+```{r clusterAllDnaseExperiments}
+# cluster all DNase-seq experiments based on ENCODE-rE2G scores for given locus gene
+cluster_scores <- cluster_dnase_experiments(pred_scores)
+
+# extract order of clustered cell types
+cluster_order <- cluster_scores$labels[cluster_scores$order]
+
+# make dendrogram and save to pdf to add to figure in illustrator
+dendro <- as.dendrogram(cluster_scores)
+pdf("results/manuscript/plots/main_fig1b_e2g_dendrogram_allExperiments.pdf", height = 3, width = 10)
+plot(dendro)
+dev.off()
+```
+
+```{r clusterDefaultDnaseExperiments}
+# cluster all DNase-seq experiments based on ENCODE-rE2G scores for given locus gene
+cluster_scores_default <- cluster_dnase_experiments(pred_scores_default)
+
+# extract order of clustered cell types
+cluster_order_default <- cluster_scores_default$labels[cluster_scores_default$order]
+
+# make dendrogram and save to pdf to add to figure in illustrator
+dendro_default <- as.dendrogram(cluster_scores_default)
+pdf("results/manuscript/plots/main_fig1b_e2g_dendrogram_defaultExperiments.pdf", height = 3,
+    width = 10)
+plot(dendro_default)
+dev.off()
+```
+
+***
+
+### Make condensed locus plots
+Plot data tracks for ENCODE-rE2G scores across many cell types to create heatmap-like image of
+predicted enhancers for the locus gene.
+```{r}
+# function to create custom DataTrack with upper and lower gradient boundaries
+create_DataTrack <- function(range, name, genome, gradient, gradient_range, chromosome, from, to) {
+  
+  # create dummy entries to set gradient boundaries at the beginning of the specified window
+  dummy <- GRanges(seqnames = chromosome,
+                   ranges = IRanges(start = c(from, from + 2), end = c(from + 1, from + 3)),
+                   score = gradient_range)
+  
+  # add to range
+  chrs <- unique(c(chromosome, seqlevels(range)))
+  seqlevels(dummy) <- chrs
+  seqlevels(range) <- chrs
+  range <- c(dummy, range)
+  
+  # create DataTrack
+  DataTrack(range, name = name, genome = genome, type = "gradient", gradient = gradient,
+            chromosome = chromosome, from = from, to = to)
+  
+}
+```
+
+```{r plotAllDNaseExperimets}
+# create data tracks for ENCODE-E2G predictions in all samples
+e2g_score_tracks <- lapply(pred_scores[cluster_order], FUN = create_DataTrack,
+                           name = "e2g", genome = "hg38", gradient = c("#ffc2c2", "#ad2424"),
+                           gradient_range = c(0.201, 1), chromosome = as.character(seqnames(locus)),
+                           from = start(locus), to = end(locus))
+
+# make plot
+pdf("results/manuscript/plots/main_fig1b_prkar2b_allExperiments.pdf", height = 4.5, width = 10)
+plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+dev.off()
+```
+
+```{r plotDefaultDNaseExperimets}
+# create data tracks for ENCODE-E2G predictions in all samples
+e2g_score_tracks_default <- lapply(pred_scores_default[cluster_order_default],
+                                   FUN = create_DataTrack, name = "e2g", genome = "hg38",
+                                   gradient = c("#ffc2c2", "#ad2424"),
+                                   gradient_range = c(0.201, 1),
+                                   chromosome = as.character(seqnames(locus)),
+                                   from = start(locus), to = end(locus))
+
+# make plot
+pdf("results/manuscript/plots/main_fig1b_prkar2b_defaultExperiments.pdf", height = 4.5, width = 10)
+plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+dev.off()
+```
+
+```{r plotFullLocusPlot}
+# combine all tracks into one list
+all_tracks <- c(detailed_tracks, e2g_score_tracks_default)
+
+# relative heights for all tracks
+track_sizes_full <- c(detailed_track_sizes, rep_along(e2g_score_tracks_default, 0.025))
+
+# make plot
+pdf("results/manuscript/plots/main_fig1b_prkar2b_full_view.pdf", height = 10, width = 10)
+plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), from = start(locus),
+           to = end(locus), sizes = track_sizes_full, background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+dev.off()
+```
+
+```{r}
+# plot one track to extract score gradient legend for illustrator
+pdf("results/manuscript/plots/main_fig1b_e2g_legend.pdf", height = 5, width = 10)
+plotTracks(e2g_score_tracks[[1]], chromosome = as.character(seqnames(locus)), from = start(locus),
+           to = end(locus), background.title = "transparent", col.axis = "black",
+           fontcolor.title = "black", fontface.title = 1)
+dev.off()
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

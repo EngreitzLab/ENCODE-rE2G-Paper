@@ -1,0 +1,628 @@
+---
+title: "Indirect effects"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# save.image("indirect_effects.rda")
+# stop()
+
+# set output html chunk options
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Analyze impact of indirect effects on performance.
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(ggExtra)
+library(cowplot)
+library(DT)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+***
+
+## Used data
+```{r}
+# column types in crispr data files
+crispr_cols <- cols(ValidConnection = col_character(), merged_uid = col_character())
+
+# load crispr data files
+crispr_training <- read_tsv(snakemake@input$crispr_training, col_types = crispr_cols)
+crispr_heldout <- read_tsv(snakemake@input$crispr_heldout, col_types = crispr_cols)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = FALSE,
+                                include_col = "crispr_main_benchmarks")
+
+# load merged data for both datasets
+merged_training <- read_tsv(snakemake@input$merged_training, col_types = crispr_cols)
+merged_heldout  <- read_tsv(snakemake@input$merged_heldout,  col_types = crispr_cols)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_training <- processMergedData(merged_training, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE)
+
+merged_heldout <- processMergedData(merged_heldout, pred_config = pred_config,
+                                    filter_valid_connections = TRUE,
+                                    include_missing_predictions = TRUE)
+
+# load table with performance summary for training data
+perf_training <- read_tsv(snakemake@input$perf_training, show_col_types = FALSE)
+
+# load cis and trans ratios
+cis_ratio <- read_tsv(snakemake@input$cis_ratio, show_col_types = FALSE)
+trans_ratio <- read_tsv(snakemake@input$trans_ratio, show_col_types = FALSE)
+
+# filter cis positive ratio data to within 1Mb
+dist_bins_1mb <- unique(cis_ratio$dist_bin)[1:20]
+cis_ratio <- filter(cis_ratio, dist_bin %in% dist_bins_1mb)
+```
+
+***
+
+## Estimated indirect positives
+Based in the calculated trans-effect ratio, calculate the expected number and ratio of positives
+due to indirect effects in each dataset. This is a rough estimation, since it does not respect any
+additional filters in case of the DC-TAP-seq dataset.
+```{r}
+# held-out  and training dataset to include in the analyses with name mapping 
+use_datasets <- c(K562_DC_TAP = "K562_DC_TAPseq", WTC11_DC_TAP = "WTC11_DC_TAPseq",
+                      Klann = "Klann2021", Xie = "Xie2019", Gasperini2019 = "Gasperini2019")
+
+# rename datasets in merged data to be consistent with indirect effects analysis
+merged_heldout <- mutate(merged_heldout, Dataset = recode(Dataset, !!!use_datasets))
+
+# extract ENCODE-rE2G scpres for CRISPR E-G pairs in selected held-out datasets
+e2g_crispr_heldout <- merged_heldout %>% 
+  filter(pred_uid == "ENCODE_rE2G.Score") %>% 
+  filter(Dataset %in% use_datasets) %>% 
+  mutate(name = paste0(measuredGeneSymbol, "|", chrom, ":", chromStart, "-", chromEnd)) %>% 
+  select(dataset = Dataset, name, Regulated, pred_value)
+
+# extract CRISPR E-G pairs for training datasets
+e2g_crispr_training <- merged_training %>% 
+  filter(pred_uid == "ENCODE_rE2G.Score") %>% 
+  filter(Dataset %in% use_datasets) %>% 
+  mutate(name = paste0(measuredGeneSymbol, "|", chrom, ":", chromStart, "-", chromEnd)) %>% 
+  select(dataset = Dataset, name, Regulated, pred_value)
+
+# combine into one table
+e2g_crispr <- bind_rows(heldout = e2g_crispr_heldout, training = e2g_crispr_training, .id = "type")
+
+# count the number of total and positive pairs
+e2g_crispr_pairs <- e2g_crispr %>% 
+  group_by(type, dataset) %>% 
+  summarize(valid_pairs = n(), positives = sum(Regulated == TRUE), .groups = "drop")
+```
+
+```{r}
+# count the number of unfiltered cis pairs per dataset
+cis_pairs <- cis_ratio %>% 
+  filter(dataset %in% use_datasets) %>% 
+  group_by(type, dataset) %>% 
+  summarize(total_pairs = sum(total_pairs), regulated_pairs = sum(regulated_pairs),
+            .groups = "drop")
+
+# add expected ratio of indirect effects and calculate the number expected indirect positives
+cis_pairs <- cis_pairs %>% 
+  left_join(select(trans_ratio, type, dataset, indirect_ratio = positive_ratio_regulated),
+            by = c("type", "dataset")) %>% 
+  mutate(expected_indirect_positives = floor(total_pairs * indirect_ratio))
+```
+
+```{r}
+# add expected number of indirect positives to E2G crispr pairs and calculate the expected
+# proportion of positives that are indirect
+e2g_crispr_pairs <- cis_pairs %>% 
+  select(type, dataset, total_pairs, indirect_ratio, expected_indirect_positives) %>% 
+  left_join(e2g_crispr_pairs, ., by = c("type", "dataset")) %>% 
+  mutate(perc_expected_indirect_positives = expected_indirect_positives / positives)
+```
+
+***
+
+## Indirect effects vs. recall
+Correlate the number of expected indirect positives with ENCODE-rE2G recall for each dataset.
+
+```{r}
+# get ENCODE-rE2G threshold
+e2g_threshold <- pull(filter(pred_config, pred_uid == "ENCODE_rE2G.Score"), "alpha")
+
+# compute recall of ENCODE-rE2G on held-out datasets
+recall_heldout <- e2g_crispr_heldout %>% 
+  filter(Regulated == TRUE) %>% 
+  group_by(dataset) %>% 
+  summarize(recall = mean(pred_value > e2g_threshold))
+
+# compute recall of ENCODE-rE2G on trainig datasets
+recall_training <- e2g_crispr_training %>% 
+  filter(Regulated == TRUE) %>% 
+  group_by(dataset) %>% 
+  summarize(recall = mean(pred_value > e2g_threshold))
+
+# combine into one table and add to indirect effects table
+e2g_crispr_pairs <- bind_rows(heldout = recall_heldout, training = recall_training, .id = "type") %>% 
+  left_join(e2g_crispr_pairs, ., by = c("type", "dataset"))
+```
+
+```{r, fig.height=4, fig.width=6}
+# plot the expected proportion of indirect positives vs. ENCODE-rE2G recall
+ggplot(e2g_crispr_pairs, aes(x = recall, y = perc_expected_indirect_positives, color = dataset)) +
+  geom_point() +
+  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "black", linewidth = 0.5) +
+  labs(title = "Expected indirect positives vs. recall", x = "Recall (ENCODE-rE2G)",
+       y = "Expected indirect positives", color = "Dataset") +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+  theme_bw() +
+  theme(text = element_text(size = 13))
+```
+
+***
+
+## Indirect effects as function of distance
+
+```{r, fig.height=4, fig.width=7}
+# plot the positive hit ratio as a function of distance to TSS
+ggplot(cis_ratio, aes(x = mean_dist / 1e6, y = positive_ratio_regulated, color = dataset)) +
+  geom_point() +
+  labs(title = "Cis-positive hit ratio", x = "Distance to TSS (Mb)", y = "Positive hit ratio",
+       color = "Dataset") +
+  theme_bw() +
+  theme(text = element_text(size = 13))
+```
+
+```{r}
+# add expected indirect effect ratio to cis positive ratios
+cis_ratio <- cis_ratio %>% 
+  left_join(select(trans_ratio, dataset, indirect_ratio = positive_ratio_regulated),
+            by = "dataset")
+
+# calculate expected direct effects ratio
+cis_ratio <- cis_ratio %>% 
+  rowwise() %>%
+  mutate(direct_ratio = max(positive_ratio_regulated - indirect_ratio, 0))
+
+# average direct_ratio across datasets to mitigate zeros
+cis_ratio_model <- cis_ratio %>% 
+  group_by(dist_bin) %>% 
+  summarize(direct_ratio = mean(direct_ratio),
+            dist_to_tss = mean(mean_dist)) %>% 
+  filter(direct_ratio > 0)
+
+# fit a power law to model the positive hit ratio as a function of distance to TSS
+fit <- lm(log(direct_ratio) ~ log(dist_to_tss), data = cis_ratio_model)
+
+# extract fitted coefficients
+a <- exp(coef(fit)[1])
+b <- coef(fit)[2]
+
+cat("Fitted model: positive_ratio_regulated = ", round(a, 4), " * dist_to_tss^", round(b, 4), "\n")
+```
+
+```{r, fig.height=4, fig.width=7}
+# plot the positive hit ratio vs. distance to TSS in log space and show the fitted power law
+ggplot(cis_ratio, aes(x = mean_dist, y = direct_ratio, color = dataset)) +
+  geom_point() +
+  stat_function(fun = function(x) a * x^b, color = "black") +
+  labs(title = "Cis-positive hit ratio (log space)", x = "Distance to TSS (bp)", y = "Positive hit ratio",
+       color = "Dataset") +
+  scale_y_log10() +
+  scale_x_log10() +
+  annotation_logticks() +
+  theme_bw() +
+  theme(text = element_text(size = 13))
+```
+
+```{r, fig.height=4, fig.width=5.25}
+# plot the positive hit ratio vs. distance to TSS in log space and show the fitted power law
+ggplot(cis_ratio_model, aes(x = dist_to_tss, y = direct_ratio)) +
+  geom_point(color = "steelblue") +
+  stat_function(fun = function(x) a * x^b, color = "black") +
+  labs(title = "Cis-positive hit ratio (log space)", x = "Distance to TSS (bp)", y = "Positive hit ratio",
+       color = "Dataset") +
+  scale_y_log10() +
+  scale_x_log10() +
+  annotation_logticks() +
+  theme_bw() +
+  theme(text = element_text(size = 13))
+```
+
+
+```{r}
+# function to predict the cis-positive hit ratio for a given distance
+predict_cis_hit_ratio <- function(fit, new_data) {
+  
+  # predict positive hit ratio for provided distances and exponentiate to get back to original scale
+  predicted_log_direct_ratio <- predict(fit, newdata = new_data)
+  predicted_direct_ratio <- exp(predicted_log_direct_ratio)
+  
+  # cap predicted values at 1, because the ratio can't be higher than that
+  predicted_direct_ratio <- pmin(predicted_direct_ratio, 1)
+  
+  # add predicted values to data
+  new_data$predicted_direct_ratio <- predicted_direct_ratio
+  
+  return(new_data)
+  
+}
+```
+
+Predict cis-positive ratio for all CRISPR E-G pairs in the training and held-out data and add
+the expected trans-positive rate for every dataset.
+```{r}
+# extract all CRISPR E-G pairs of the held-out data including distance to TSS
+crispr_pairs_heldout <- merged_heldout %>% 
+  filter(Dataset %in% use_datasets) %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  select(name, Dataset, Regulated, dist_to_tss = pred_value)
+
+# extract all CRISPR E-G pairs of the training data including distance to TSS
+crispr_pairs_training <- merged_training %>% 
+  filter(Dataset %in% use_datasets) %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  select(name, Dataset, Regulated, dist_to_tss = pred_value)
+
+# combine into one table
+crispr_pairs <- bind_rows(heldout = crispr_pairs_heldout, training = crispr_pairs_training,
+                          .id = "type")
+  
+# predict the expected cis-positive rate for each E-G pair
+crispr_pairs  <- predict_cis_hit_ratio(fit, new_data = crispr_pairs)
+
+# add expected indirect ratio for each E-G pair based on the dataset
+crispr_pairs <- crispr_pairs %>% 
+  left_join(select(trans_ratio, dataset, indirect_ratio = positive_ratio_regulated),
+            by = c("Dataset" = "dataset"))
+
+# compute probability of a CRISPR E-G pair being cis vs indirect for each distance bin
+crispr_pairs <- crispr_pairs %>% 
+  mutate(prob_cis_vs_trans = predicted_direct_ratio / (predicted_direct_ratio + indirect_ratio))
+```
+
+```{r, fig.height=4, fig.width=7}
+# plot the predicted probability of being a cis vs. trans effect as function of distance
+ggplot(crispr_pairs, aes(x = dist_to_tss / 1e6, y = prob_cis_vs_trans, color = Dataset)) +
+  geom_line() +
+  labs(title = "Probability direct vs. indirect effect", x = "Distance to TSS (Mb)",
+       y = "Probability direct vs. indirect effect ", color = "Dataset") +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_bw() +
+  theme(text = element_text(size = 13))
+```
+
+***
+
+## Weighted recall
+Compute recall for all models weighted by the probability of a CRISPR E-G pair being a direct cis
+versus an indirect effect.
+```{r}
+# function to calculate (weighted) recall for one predictor
+calc_weighted_recall_pred <- function(data, pred, thresholds, weighted_recall = TRUE) {
+  
+  # get threshold for the given predictor
+  pred_thresh <- thresholds[[pred]]
+  
+  # only retain CRISPR positives
+  data_pos <- filter(data, Regulated == TRUE)
+  
+  if (weighted_recall == FALSE) {
+    recall <- mean(data_pos[[pred]] > pred_thresh)
+  } else {
+    
+    # get weighted true positives and false negatives
+    tp <- pull(filter(data_pos, !! sym(pred) >= pred_thresh), prob_cis_vs_trans)
+    fn <- pull(filter(data_pos, !! sym(pred) <  pred_thresh), prob_cis_vs_trans)
+    
+    # calculate weighted recall
+    recall <- sum(tp) / sum(tp, fn)
+    
+  }
+  
+  return(recall)
+  
+}
+
+# function to calculate boostrapped (weighted) recall for all predictors
+calc_weighted_recall <- function(data, indices, preds, thresholds, weighted_recall = TRUE) {
+  
+  # select bootstrap sample
+  data <- data[indices, ]
+  
+  # bootstrap recall
+  names(preds) <- preds
+  recall <- lapply(preds, FUN = calc_weighted_recall_pred, data = data, thresholds = thresholds,
+                   weighted_recall = weighted_recall)
+  #recall <- enframe(unlist(recall), name = "predictor", value = "recall")
+  
+  return(unlist(recall))
+  
+}
+
+# function to calculate bootstrapped recall and get confidence intervals
+boostrap_weighted_recall <- function(data, preds, thresholds, weighted_recall = TRUE, ncpus = 1,
+                                     R = 10000, conf = 0.95, ci_type = c("perc", "norm", "basic", "bca")) {
+  
+  # parse input arguments
+  ci_type <- match.arg(ci_type)
+   
+  # set parallel argument for boot function
+  parallel <- ifelse(ncpus > 1, yes = "multicore", no = "no")
+  
+  # calculate boostrapped recall
+  message("Running bootstraps...")
+  bs_perf <- boot(data, statistic = calc_weighted_recall, preds = preds, thresholds = thresholds,
+                  weighted_recall = weighted_recall, R = R, parallel = parallel, ncpus = ncpus)
+  
+  message("Computing confidence intervals...")
+  pred_indices <- seq_along(bs_perf$t0)[!is.na(bs_perf$t0)]  # indices of non-NA predictors 
+  ci <- bplapply(pred_indices, FUN = boot.ci, boot.out = bs_perf, conf = conf,
+                 type = ci_type)
+  
+  # process boot.ci output to make pretty output table
+  output <- process_ci(ci, boot = bs_perf, metric = "recall")
+  
+  return(output)
+  
+}
+```
+
+
+```{r}
+# models to include in comparisons
+models <- c("ENCODE_rE2G.Score", "ABCdnase.ABC.Score", "EpiMap.Score",
+            "correlation_k562_dnase.glsDNase.Score", "baseline.distToTSS")
+
+# only retain data on models to compare
+pred_config <- filter(pred_config, pred_uid %in% models)
+merged_training <- filter(merged_training, pred_uid %in% models)
+merged_heldout <- filter(merged_heldout, pred_uid %in% models)
+
+# convert merged data for bootstrapping
+merged_training_bs <- convertMergedForBootstrap(merged_training, pred_config = pred_config)
+merged_heldout_bs  <- convertMergedForBootstrap(merged_heldout,  pred_config = pred_config)
+
+# get thresholds to compute performance
+thresholds <- getThresholdValues(pred_config, threshold_col = "alpha")
+
+# add predicted probabilities of being a cis effect to merged data and retain only used datasets
+merged_training_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_training_bs, ., by = "name")
+
+merged_heldout_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_heldout_bs, ., by = "name")
+
+# calculate bootstrapped weighted recall for both training and heldout CRISPR data
+weighted_recall_training <- boostrap_weighted_recall(merged_training_bs, preds = models,
+                                                     thresholds = thresholds)
+weighted_recall_heldout <- boostrap_weighted_recall(merged_heldout_bs, preds = models,
+                                                    thresholds = thresholds)
+```
+
+```{r, fig.width=8, fig.height=4}
+# combine into one table
+perf_threshold <- bind_rows(Training = weighted_recall_training,
+                            `Held-out` = weighted_recall_heldout,
+                            .id = "crispr_dataset")
+
+# add predictor names for plotting
+perf_threshold <- perf_threshold %>% 
+  left_join(select(pred_config, pred_uid, pred_name_long), by = c("id" = "pred_uid"))
+
+# make predictor name a factor ordered by performance on training data
+pred_order <- pull(arrange(perf_training, PrecMinSens), pred_name_long)
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+
+# get colors for all models to plot
+pred_colors <- pred_config %>% 
+  filter(pred_uid %in% models) %>% 
+  select(pred_name_long, color) %>% 
+  deframe()
+
+# plot weighted recall
+ggplot(perf_threshold, aes(y = pred_name_long, x = full, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Weighted recall\nSelected CRISPR datasets", x = "Weighted recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+Calculate and plot normal, unweighted recall for the same CRISPR data:
+```{r, fig.width=8, fig.height=4}
+# calculate bootstrapped unweighted (normal) recall for both training and heldout CRISPR data
+recall_training <- boostrap_weighted_recall(merged_training_bs, preds = models,
+                                            thresholds = thresholds, weighted_recall = FALSE)
+recall_heldout <- boostrap_weighted_recall(merged_heldout_bs, preds = models,
+                                           thresholds = thresholds, weighted_recall = FALSE)
+
+# combine into one table
+perf_threshold <- bind_rows(Training = recall_training,
+                            `Held-out` = recall_heldout,
+                            .id = "crispr_dataset")
+
+# add predictor names for plotting
+perf_threshold <- perf_threshold %>% 
+  left_join(select(pred_config, pred_uid, pred_name_long), by = c("id" = "pred_uid"))
+
+# make predictor name a factor ordered by performance on training data
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+
+# plot recall
+ggplot(perf_threshold, aes(y = pred_name_long, x = full, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Recall\nSelected CRISPR datasets", x = "Recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+***
+
+## Canonical enhancers
+Filter CRISPR data for canonical enhancers and compute weighted recall.
+
+10% effect size
+```{r}
+# set CTCF and H3K27me3 sites to Regulated == FALSE
+non_enh <- c("CTCF overlap", "H3K27me3 overlap")
+merged_training <- merged_training %>% 
+  mutate(Regulated = if_else(element_category %in% non_enh, true = FALSE, false = Regulated))
+merged_heldout <- merged_heldout %>% 
+  mutate(Regulated = if_else(element_category %in% non_enh, true = FALSE, false = Regulated))
+
+# filter based on H3K27ac and CRISPR effect size
+merged_training_filt <- merged_training %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.1)))
+merged_heldout_filt <- merged_heldout %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.1)))
+
+# convert merged data for bootstrapping
+merged_training_filt_bs <- convertMergedForBootstrap(merged_training_filt, pred_config = pred_config)
+merged_heldout_filt_bs  <- convertMergedForBootstrap(merged_heldout_filt,  pred_config = pred_config)
+
+# add predicted probabilities of being a cis effect to merged data and retain only used datasets
+merged_training_filt_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_training_filt_bs, ., by = "name")
+
+merged_heldout_filt_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_heldout_filt_bs, ., by = "name")
+
+# calculate bootstrapped weighted recall for both training and heldout CRISPR data
+weighted_recall_training <- boostrap_weighted_recall(merged_training_filt_bs, preds = models,
+                                                     thresholds = thresholds)
+weighted_recall_heldout <- boostrap_weighted_recall(merged_heldout_filt_bs, preds = models,
+                                                    thresholds = thresholds)
+```
+
+```{r, fig.width=8, fig.height=4}
+# combine into one table
+perf_threshold <- bind_rows(Training = weighted_recall_training,
+                            `Held-out` = weighted_recall_heldout,
+                            .id = "crispr_dataset")
+
+# add predictor names for plotting
+perf_threshold <- perf_threshold %>% 
+  left_join(select(pred_config, pred_uid, pred_name_long), by = c("id" = "pred_uid"))
+
+# make predictor name a factor ordered by performance on training data
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+
+
+# plot weighted recall
+ggplot(perf_threshold, aes(y = pred_name_long, x = full, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Weighted recall\nCanonical enhancers", x = "Weighted recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+5% effect size
+```{r}
+# filter based on H3K27ac and CRISPR effect size
+merged_training_filt <- merged_training %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.05)))
+merged_heldout_filt <- merged_heldout %>% 
+  filter(!((Regulated == TRUE & element_category == "H3K27ac low") | (Regulated == TRUE & EffectSize > -0.05)))
+
+# convert merged data for bootstrapping
+merged_training_filt_bs <- convertMergedForBootstrap(merged_training_filt, pred_config = pred_config)
+merged_heldout_filt_bs  <- convertMergedForBootstrap(merged_heldout_filt,  pred_config = pred_config)
+
+# add predicted probabilities of being a cis effect to merged data and retain only used datasets
+merged_training_filt_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_training_filt_bs, ., by = "name")
+
+merged_heldout_filt_bs <- crispr_pairs %>% 
+  select(name, predicted_direct_ratio, indirect_ratio, prob_cis_vs_trans) %>% 
+  inner_join(merged_heldout_filt_bs, ., by = "name")
+
+# calculate bootstrapped weighted recall for both training and heldout CRISPR data
+weighted_recall_training <- boostrap_weighted_recall(merged_training_filt_bs, preds = models,
+                                                     thresholds = thresholds)
+weighted_recall_heldout <- boostrap_weighted_recall(merged_heldout_filt_bs, preds = models,
+                                                    thresholds = thresholds)
+```
+
+```{r, fig.width=8, fig.height=4}
+# combine into one table
+perf_threshold <- bind_rows(Training = weighted_recall_training,
+                            `Held-out` = weighted_recall_heldout,
+                            .id = "crispr_dataset")
+
+# add predictor names for plotting
+perf_threshold <- perf_threshold %>% 
+  left_join(select(pred_config, pred_uid, pred_name_long), by = c("id" = "pred_uid"))
+
+# make predictor name a factor ordered by performance on training data
+perf_threshold <- perf_threshold %>% 
+  mutate(pred_name_long = factor(pred_name_long, levels = pred_order, ordered = TRUE))
+
+
+# plot weighted recall
+ggplot(perf_threshold, aes(y = pred_name_long, x = full, fill = pred_name_long,
+                           alpha = crispr_dataset, group = crispr_dataset)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(title = "Weighted recall\nCanonical enhancers", x = "Weighted recall",
+       alpha = "CRISPR\ndataset", fill = "Predictor") +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(Training = 0.33, `Held-out` = 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), text = element_text(size = 13))
+```
+
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

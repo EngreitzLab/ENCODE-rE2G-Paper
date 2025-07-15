@@ -1,0 +1,7 @@
+# directories for project
+proj_dir: "/oak/stanford/groups/engreitz/Users/agschwin/distal_regulation_paper"
+share_dir: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions"
+scratch_dir: "/scratch/users/agschwin/encode_manuscript"
+
+# seed for all random processes
+seed: 20241122

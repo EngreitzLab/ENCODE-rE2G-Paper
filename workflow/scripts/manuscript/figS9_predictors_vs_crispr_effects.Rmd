@@ -1,0 +1,196 @@
+---
+title: "Supplementary Figure 9: Predictor scores vs. CRISPR effect size"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Create plots for CRISPR benchmarking supplementary figure in predictor scores vs. observed CRISPRi
+effect sizes.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(ggrastr)
+library(rtracklayer)
+library(cowplot)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+```
+
+***
+
+```{r loadData}
+# load merged data for different datasets
+merged_combined <- fread(snakemake@input$merged_combined)
+merged_nasser <- fread(snakemake@input$merged_nasser)
+merged_gasperini <- fread(snakemake@input$merged_gasperini)
+merged_schraivogel <- fread(snakemake@input$merged_schraivogel)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_main_benchmarks")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_combined <- processMergedData(merged_combined, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+merged_nasser <- processMergedData(merged_nasser, pred_config = pred_config,
+                                  filter_valid_connections = TRUE,
+                                  include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+merged_gasperini <- processMergedData(merged_gasperini, pred_config = pred_config,
+                                      filter_valid_connections = TRUE,
+                                      include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+merged_schraivogel <- processMergedData(merged_schraivogel, pred_config = pred_config,
+                                        filter_valid_connections = TRUE,
+                                        include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+```
+
+```{r, warning=FALSE}
+# function to convert distance to TSS to log10(1/distance)
+convert_distToTSS <- function(merged) {
+  merged %>% 
+    mutate(pred_value = if_else(pred_uid == "baseline.distToTSS",
+                                true = log10(1/pred_value),
+                                false = pred_value)) %>% 
+    mutate(pred_name_long = if_else(pred_uid == "baseline.distToTSS",
+                                    true = "log10(1/Distance to TSS)",
+                                    false = pred_name_long))
+}
+
+# convert distance to TSS to 
+merged_combined <- convert_distToTSS(merged_combined)
+merged_nasser <- convert_distToTSS(merged_nasser)
+merged_gasperini <- convert_distToTSS(merged_gasperini)
+merged_schraivogel <- convert_distToTSS(merged_schraivogel)
+```
+
+```{r}
+# re-implement score vs effect size scatter plot function to use rasterized layer for points
+makeScatterPlots <- function(df, x_col, y_col, color_col = NULL, x_lab = NULL, y_lab = NULL,
+                             title = NULL, colors = NULL, pred_names_col = "pred_uid",
+                             point_size = 2, text_size = 13, alpha_value = 1, ncol = NULL,
+                             nrow = NULL) {
+  
+  # create labels and title based on input parameters
+  if (is.null(x_lab)) x_lab <- x_col
+  if (is.null(y_lab)) y_lab <- y_col
+  if (is.null(title)) title <- paste(x_col, "vs", y_col)
+  
+  # convert column names to symbols for ggplot
+  x_col <- sym(x_col)
+  y_col <- sym(y_col)
+  if (!is.null(color_col)) color_col <- sym(color_col)
+  
+  # plot x_col vs y_col across predictors
+  p <- ggplot(df, aes(x = !!x_col, y = !!y_col, color = !!color_col)) +
+    facet_wrap(as.formula(paste("~", pred_names_col)), scales = "free", ncol = ncol, nrow = nrow) +
+    rasterize(geom_point(size = point_size, alpha = alpha_value), dpi = 300) +
+    labs(title = title, x = x_lab, y = y_lab) +
+    theme_bw() +
+    theme(legend.position = "bottom", text = element_text(size = text_size))
+  
+  # set colors if provided
+  if (!is.null(colors)) {
+    p <- p + scale_color_manual(values = colors)
+  }
+  
+  return(p)
+  
+}
+
+```
+
+```{r}
+# get number of E-G pairs per dataset
+comb_pairs <- n_distinct(merged_combined$name)
+nasser_pairs <- n_distinct(merged_nasser$name)
+gasp_pairs <- n_distinct(merged_gasperini$name)
+schrai_pairs <- n_distinct(merged_schraivogel$name)
+
+# create titles for plots
+comb_title <- paste0("Combined CRISPR data", " (", scales::label_comma()(comb_pairs), " pairs)")
+nasser_title <- paste0("Nasser et al., 2021", " (", scales::label_comma()(nasser_pairs), " pairs)")
+gasp_title <- paste0("Gasperini et al., 2019", " (", scales::label_comma()(gasp_pairs), " pairs)")
+schrai_title <- paste0("Schraivogel et al., 2020", " (", scales::label_comma()(schrai_pairs),
+                       " pairs)")
+
+# make predictor vs effect size scatter plots
+combined_cor_plot <- plotPredictorsVsEffectSize(merged_combined, pos_col = "Regulated",
+                       pred_names_col = "pred_name_long", point_size = 1, corr_groups = NULL,
+                       text_size = 10, alpha_value = 1, cor_method = "pearson", label.x.npc = 0.4,
+                       nrow = 2, title = comb_title)
+
+nasser_cor_plot <- plotPredictorsVsEffectSize(merged_nasser, pos_col = "Regulated",
+                    pred_names_col = "pred_name_long", point_size = 1, corr_groups = NULL,
+                    text_size = 10, alpha_value = 1, cor_method = "pearson", label.x.npc = 0.4,
+                    nrow = 2, title = nasser_title)
+
+gasperini_cor_plot <- plotPredictorsVsEffectSize(merged_gasperini, pos_col = "Regulated",
+                        pred_names_col = "pred_name_long", point_size = 1, corr_groups = NULL,
+                        text_size = 10, alpha_value = 1, cor_method = "pearson", label.x.npc = 0.4,
+                        nrow = 2, title = gasp_title)
+
+schraivogel_cor_plot <- plotPredictorsVsEffectSize(merged_schraivogel, pos_col = "Regulated",
+                          pred_names_col = "pred_name_long", point_size = 1, corr_groups = NULL,
+                          text_size = 10, alpha_value = 1, cor_method = "pearson",
+                          label.x.npc = 0.4, nrow = 2, title = schrai_title)
+```
+
+```{r, fig.height=14, fig.width=10}
+# get common legend from combined dataset
+legend <- get_legend(
+  combined_cor_plot +
+    labs(color = "Regulated:") + 
+    theme(text = element_text(size = 13))
+  )
+
+# customized ggplot2 theme for correlation plots
+cor_theme <- theme(axis.text = element_text(color="black"), legend.position = "none",
+                   panel.grid = element_blank(), strip.text.x = element_text(size = 9),
+                   strip.background = element_rect(color = NA, fill = NA))
+
+# arrange plots into figure
+plot_grid(
+  legend,
+  combined_cor_plot + cor_theme,
+  nasser_cor_plot + cor_theme,
+  gasperini_cor_plot + cor_theme,
+  schraivogel_cor_plot + cor_theme,
+  ncol = 1, rel_heights = c(1, 5, 5, 5, 5)
+  )
+
+# save to pdf
+ggsave(filename = "results/manuscript/plots/figS9_predictors_vs_crispr_effects_rasterized.pdf",
+       height = 14, width = 10)
+```
+
+***
+
+## Session information
+
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

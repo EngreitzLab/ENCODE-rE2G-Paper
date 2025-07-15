@@ -1,0 +1,543 @@
+---
+title: "Extended Data Fig. 2 - CRISPR benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Create plots for CRISPR benchmarking Extended Data Figure 2.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(rtracklayer)
+library(cowplot)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+source("workflow/scripts/random_gene_pred_functions.R")
+```
+
+***
+
+## DHS Baseline predictors
+
+Plot Precision-Recall curves for all baseline predictors based on DHS sites.
+```{r}
+# load TSS annotations
+tss_annot <- read_tsv(snakemake@input$tss_annot, show_col_types = FALSE, col_select = 1:6)
+
+# create GRanges object with TSS annotations
+tss_annot <- makeGRangesFromDataFrame(tss_annot, seqnames.field = "#chr", keep.extra.columns = TRUE,
+                                      starts.in.df.are.0based = TRUE)
+
+# load list of expressed genes in K562
+expr_genes <- fread(snakemake@input$expr_genes)
+
+# load pred_config file
+pred_config_bl <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                   include_col = "crispr_baseline_figure")
+
+# load merged data for DHS baseline predictors
+merged_dhs <- fread(snakemake@input$merged_baseline_dhs)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_dhs <- processMergedData(merged_dhs, pred_config = pred_config_bl,
+                                filter_valid_connections = TRUE,
+                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+```
+
+```{r}
+# compute precision-recall tables
+pr_dhs <- calcPRCurves(merged_dhs, pred_config = pred_config_bl, pos_col = "Regulated")
+
+# calculate number and percentage of experimental true positives in the CRISPR datasets
+n_pos_dhs <- calcNPos(merged_dhs, pos_col = "Regulated")
+pct_pos_dhs <- calcPctPos(merged_dhs, pos_col = "Regulated")
+
+# get number of tested enhancer gene pairs in merged data and create title for PR plot
+n_pairs_dhs <- n_distinct(merged_dhs$name)
+pr_title_dhs <- paste0("DHS baseline predictors", " (", scales::label_comma()(n_pairs_dhs), " E-G pairs)")
+
+# get colors for predictors in plots
+pred_colors_dhs <- deframe(select(pred_config_bl, pred_name_long, color))
+```
+
+```{r PRCFunction}
+# create PRC plots with sets of predictors highlighted at a time
+plotPRCsets <- function(pr_df, pred_config, sets, n_pos, pct_pos, plot_name, pred_colors,
+                        min_sensitivity = 0.7, line_width = 1.2, point_size = 3.5, text_size = 13) {
+  
+  # get names of sets for plot titles
+  titles <- names(sets)
+  
+  # create plots with highlighted sets of predictors
+  mapply(sets, titles, FUN = plotPRCSset,
+         MoreArgs = list(pr_df = pr_df, pred_config = pred_config, n_pos = n_pos, pct_pos = pct_pos,
+                        min_sensitivity = min_sensitivity, line_width = line_width,
+                        point_size = point_size, text_size = text_size, pred_colors = pred_colors),
+         SIMPLIFY = FALSE)
+  
+}
+
+# function to plot PRCs and highlight one set of predictors
+plotPRCSset <- function(pr_df, pred_config, set, n_pos, pct_pos, plot_name, min_sensitivity,
+                        line_width, point_size, text_size, pred_colors) {
+  
+  # get colors for set of predictors and set others to NA
+  pred_colors[!names(pred_colors) %in% set] <- NA_character_
+  
+  # create PRC plot
+  makePRCurvePlot(pr_df = pr_df, pred_config = pred_config, n_pos = n_pos, pct_pos = pct_pos,
+                  min_sensitivity = min_sensitivity, plot_name = plot_name, line_width = line_width,
+                  point_size = point_size, text_size = text_size, colors = pred_colors,
+                  plot_thresholds = FALSE) +
+    geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+  
+}
+```
+
+```{r}
+# sets of predictors to highlight
+pred_sets_dhs <- list(
+  "Distance" = c(
+    "ENCODE-rE2G_Extended",
+    "In element (DHS) & distance to TSS",
+    "In element (DHS) & distance to gene",
+    "In element (DHS) & closest gene",
+    "In element (DHS) & closest expr. TSS",
+    "In element (DHS) & closest TSS",
+    "In element (DHS) & closest expr. gene",
+    "In element (DHS) & within 100kb of TSS",
+    "Distance to TSS"
+    ),
+  "Activity x Contact" = c(
+    "ENCODE-rE2G_Extended",
+    "ABC_A=DNase x H3K27ac, C=ENCODE Hi-C",
+    "In element (DHS) & DNase RPM x distance",
+    "In element (DHS) & DNase RPM x distance (norm.)",
+    "In element (DHS) & H3K27ac RPM x distance",
+    "In element (DHS) & H3K27ac RPM x distance (norm.)",
+    "Distance to TSS"
+    )
+  )
+
+# get pred_uid for these
+plot_preds <- unlist(pred_sets_dhs)
+plot_pred_uids <- pred_config_bl %>% 
+  filter(pred_name_long %in% plot_preds) %>% 
+  pull(pred_uid)
+
+# filter pr object and colors only for predictors to include in plots
+pr_dhs <- filter(pr_dhs, pred_uid %in% plot_pred_uids)
+pred_colors_dhs <- pred_colors_dhs[names(pred_colors_dhs) %in% plot_preds]
+
+# manually set color for Distance to TSS, since gray is used to prevent over-plotting
+pred_colors_dhs[["Distance to TSS"]] <- "#FFA600"
+
+# create set plots
+dhs_set_plots <- plotPRCsets(pr_df = pr_dhs, pred_config = pred_config_bl, sets = pred_sets_dhs,
+                             n_pos = n_pos_dhs, pct_pos = pct_pos_dhs,
+                             pred_colors = pred_colors_dhs, min_sensitivity = 0.7,
+                             line_width = 0.75, point_size = 3, text_size = 12)
+```
+
+```{r}
+# create plot with all predictors for whole dataset
+dhs_all_prc <- makePRCurvePlot(pr_df = pr_dhs, pred_config = pred_config_bl, n_pos = n_pos_dhs,
+                               pct_pos = pct_pos_dhs, min_sensitivity = 0.7, line_width = 1,
+                               point_size = 3, text_size = 12, colors = pred_colors_dhs)
+
+# extract legend to use for all set plots
+dhs_legend <- get_legend(
+  dhs_all_prc + 
+    labs(color = "Predictor:") +
+    theme(legend.key.size = unit(1, "lines"))
+  )
+
+# create title for arranged plots
+dhs_title <- ggdraw() + 
+  draw_label(pr_title_dhs, fontface = 'bold', size = 15, x = 0, hjust = 0)
+
+# arrange PRCs into grid
+dhs_prcs <- plot_grid(
+  dhs_set_plots[[1]] + theme_classic() + theme(legend.position = "none"),
+  dhs_set_plots[[2]] + theme_classic() + theme(legend.position = "none"),
+  dhs_legend,
+  nrow = 1,
+  scale = 0.9
+)
+
+# add legend to create figure panel
+dhs_baseline_panel <- plot_grid(
+  dhs_title + theme(plot.margin = margin(0, 0, 0, 22)),
+  dhs_prcs,
+  nrow = 2,
+  rel_heights = c(0.05, 1)
+)
+```
+
+## ABC Baseline predictors
+
+Plot Precision-Recall curves for all baseline predictors based on ABC sites.
+```{r}
+# load merged data for published predictors
+merged_abc <- fread(snakemake@input$merged_baseline_abc)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_abc <- processMergedData(merged_abc, pred_config = pred_config_bl,
+                                filter_valid_connections = TRUE,
+                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+```
+
+```{r}
+# compute precision-recall tables
+pr_abc <- calcPRCurves(merged_abc, pred_config = pred_config_bl, pos_col = "Regulated")
+
+# calculate number and percentage of experimental true positives in the CRISPR datasets
+n_pos_abc <- calcNPos(merged_abc, pos_col = "Regulated")
+pct_pos_abc <- calcPctPos(merged_abc, pos_col = "Regulated")
+
+# get number of tested enhancer gene pairs in merged data and create title for PR plot
+n_pairs_abc <- n_distinct(merged_abc$name)
+pr_title_abc <- paste0("ABC baseline predictors", " (", scales::label_comma()(n_pairs_abc), " E-G pairs)")
+
+# get colors for predictors in plots
+pred_colors_abc <- deframe(select(pred_config_bl, pred_name_long, color))
+```
+
+```{r}
+# sets of predictors to highlight
+pred_sets_abc <- list(
+  "Distance" = c(
+    "ENCODE-rE2G_Extended",
+    "In element (ABC) & distance to TSS",
+    "In element (ABC) & distance to gene",
+    "In element (ABC) & closest gene",
+    "In element (ABC) & closest expr. TSS",
+    "In element (ABC) & closest TSS",
+    "In element (ABC) & closest expr. gene",
+    "In element (ABC) & within 100kb of TSS",
+    "Distance to TSS"
+    ),
+  "Activity x Contact" = c(
+    "ENCODE-rE2G_Extended",
+    "ABC_A=DNase x H3K27ac, C=ENCODE Hi-C",
+    "In element (ABC) & DNase RPM x distance",
+    "In element (ABC) & DNase RPM x distance (norm.)",
+    "In element (ABC) & H3K27ac RPM x distance",
+    "In element (ABC) & H3K27ac RPM x distance (norm.)",
+    "Distance to TSS"
+    )
+  )
+
+# get pred_uid for these
+plot_preds <- unlist(pred_sets_abc)
+plot_pred_uids <- pred_config_bl %>% 
+  filter(pred_name_long %in% plot_preds) %>% 
+  pull(pred_uid)
+
+# filter pr object only for predictors to include in plots
+pr_abc <- filter(pr_abc, pred_uid %in% plot_pred_uids)
+
+# only retain colors for predictors to show
+pred_colors_abc <- pred_colors_abc[names(pred_colors_abc) %in% plot_preds]
+
+# manually set color for Distance to TSS, since gray is used to prevent over-plotting
+pred_colors_abc[["Distance to TSS"]] <- "#FFA600"
+
+# create set plots
+abc_set_plots <- plotPRCsets(pr_df = pr_abc, pred_config = pred_config_bl, sets = pred_sets_abc,
+                             n_pos = n_pos_abc, pct_pos = pct_pos_abc,
+                             pred_colors = pred_colors_abc, min_sensitivity = 0.7,
+                             line_width = 0.75, point_size = 3, text_size = 12)
+```
+
+```{r}
+# create plot with all predictors
+abc_all_prc <- makePRCurvePlot(pr_df = pr_abc, pred_config = pred_config_bl, n_pos = n_pos_abc,
+                               pct_pos = pct_pos_abc, min_sensitivity = 0.7, line_width = 1,
+                               point_size = 3, text_size = 12, colors = pred_colors_abc)
+
+# extract legend to use for all set plots
+abc_legend <- get_legend(
+  abc_all_prc + 
+    labs(color = "Predictor:") +
+    theme(legend.key.size = unit(1, "lines"))
+  )
+
+# create title for arranged plots
+abc_title <- ggdraw() + 
+  draw_label(pr_title_abc, fontface = 'bold', size = 15, x = 0, hjust = 0)
+
+# arrange PRCs into grid
+abc_prcs <- plot_grid(
+  abc_set_plots[[1]] + theme_classic() + theme(legend.position = "none"),
+  abc_set_plots[[2]] + theme_classic() + theme(legend.position = "none"),
+  abc_legend,
+  nrow = 1,
+  scale = 0.9
+)
+
+# add legend to create figure panel
+abc_baseline_panel <- plot_grid(
+  abc_title + theme(plot.margin = margin(0, 0, 0, 22)),
+  abc_prcs,
+  nrow = 2,
+  rel_heights = c(0.05, 1)
+)
+```
+
+## Published predictors
+Make Precision-Recall and performance plots for other published semi-supervised predictors.
+
+### Precision-Recall curves
+```{r}
+# load merged data for published predictors
+merged_pub <- fread(snakemake@input$merged_published_preds)
+
+# load pred_config file for published predictions
+pred_config_pub <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                    include_col = "crispr_published_pred_figure")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_pub <- processMergedData(merged_pub, pred_config = pred_config_pub,
+                                filter_valid_connections = TRUE,
+                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+```
+
+```{r}
+# compute performance for published predictive models
+pr_pub <- calcPRCurves(merged_pub, pred_config = pred_config_pub, pos_col = "Regulated")
+perf_summary_pub <- makePRSummaryTable(pr_pub, pred_config = pred_config_pub, min_sensitivity = 0.7)
+
+# define baseline predictors to show
+preds_pub_bl <- c("Distance to TSS", "Closest expressed TSS", "Closest expressed gene",
+                  "Within 100kb of expr. TSS")
+
+# extract predictor names ordered by AUPRC performance
+preds_pub_quant <- perf_summary_pub %>% 
+  arrange(desc(AUPRC)) %>% 
+  filter(!pred_name_long %in% preds_pub_bl) %>% 
+  pull(pred_name_long)
+
+# get booleas published predictors
+preds_pub_bool <- merged_pub %>%
+  filter(pred_id != "baseline", !pred_name_long %in% preds_pub_quant) %>%
+  pull(pred_name_long) %>%
+  unique()
+
+# get colors for predictors in plots ordered by AUPRC (for quantitative predictors)
+pred_colors_pub <- deframe(select(pred_config_pub, pred_name_long, color))
+pred_colors_pub <- pred_colors_pub[c(preds_pub_quant, preds_pub_bool, preds_pub_bl)]
+
+# calculate number and percentage of experimental true positives in the CRISPR datasets
+n_pos_pub <- calcNPos(merged_pub, pos_col = "Regulated")
+pct_pos_pub <- calcPctPos(merged_pub, pos_col = "Regulated")
+
+# get number of tested enhancer gene pairs in merged data and create title for PR plot
+pr_title_pub <- paste0("Published Predictors")
+
+# create PR curve plot
+prc_pub <- makePRCurvePlot(pr_pub, n_pos = n_pos_pub, pct_pos = pct_pos_pub,
+                           plot_name = pr_title_pub, pred_config = pred_config_pub,
+                           min_sensitivity = 0.7, line_width = 0.75, point_size = 3,
+                           colors = pred_colors_pub, plot_thresholds = FALSE)
+
+# add custom plotting theme
+prc_pub <- prc_pub +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black") +
+  theme_classic() +
+  theme(text = element_text(size = 12), legend.key.size = unit(0.5, "lines"),
+        plot.title = element_text(size = 12))
+```
+
+### Performance summary
+```{r}
+# get thresholds @ 70% recall
+thresholds_pub <- deframe(select(perf_summary_pub, pred_uid, alpha_at_min_sensitivity))
+
+# convert merged data to wide format for bootstrapping
+merged_pub_bs <- convertMergedForBootstrap(merged_pub, pred_config = pred_config_pub)
+
+# run bootstraps to get 95% intervals for AUPRC and precision at threshold
+auprc_pub <- bootstrapPerformanceIntervals(merged_pub_bs, metric = "auprc", R = 1000, conf = 0.95,
+                                           ci_type = "perc", ncpus = 2)
+precision_pub <- bootstrapPerformanceIntervals(merged_pub_bs, metric = "precision", 
+                                               thresholds = thresholds_pub, R = 1000,
+                                               conf = 0.95, ci_type = "perc", ncpus = 2)
+
+# add pretty predictor names
+auprc_pub <- left_join(auprc_pub, select(pred_config_pub, pred_uid, pred_name_long),
+                       by = c("id" = "pred_uid"))
+precision_pub <- left_join(precision_pub, select(pred_config_pub, pred_uid, pred_name_long),
+                       by = c("id" = "pred_uid"))
+
+# make AUPRC barplot for published predictors
+p1 <- ggplot(auprc_pub, aes(y = fct_reorder(pred_name_long, .x = full), x = full,
+                            fill = pred_name_long)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  labs(title = "Area under PRC", x = "AUPRC", fill = "Predictor") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = pred_colors_pub) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), legend.position = "none")
+
+# make precision @ threshold barplot for published predictors
+p2 <- ggplot(precision_pub, aes(y = fct_reorder(pred_name_long, .x = full), x = full,
+                                fill = pred_name_long)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  labs(title = "Precision at 70% recall", x = "Precision", fill = "Predictor") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = pred_colors_pub) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), legend.position = "none")
+
+# arrange plots
+performance_pub <- plot_grid(p1, p2, rel_widths = c(1, 1))
+```
+
+***
+
+## Correlation between predictors
+```{r}
+# load merged data for the combined CRISPR dataset
+merged_main <- fread(snakemake@input$merged_main_preds)
+
+# pred config for main comparisons
+pred_config_main <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                     include_col = "crispr_main_benchmarks")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_main <- processMergedData(merged_main, pred_config = pred_config_main,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+# list of predictors to show in supplementary plots
+plot_preds <- grep("baseline", x = pred_config_main$pred_uid, invert = TRUE, value = TRUE)
+plot_preds <- c(plot_preds, "baseline.distToTSS")
+
+# subset merged data for predictors that should be plotted
+merged_plot <- filter(merged_main, pred_uid %in% plot_preds)
+```
+
+```{r}
+# extract predictor scores and transform to wide format
+pred_scores <- merged_plot %>% 
+  select(name, pred_name_long, pred_value) %>% 
+  pivot_wider(names_from = pred_name_long, values_from = pred_value)
+
+# compute correlation coefficients between predictors
+cor_matrix <- cor(select(pred_scores, -name), method = "spearman")
+
+# title for correlation matrix plot
+title = "Correlation of predictor scores"
+  
+# plot correlation matrix for scores of different predictors
+corr_plot <- ggcorrplot(cor_matrix, hc.order = TRUE, type = "lower", lab = TRUE, title = title,
+                        lab_size = 2, tl.cex = 8)
+```
+
+***
+
+## Correlation of predictor scores with CRISPRi effect sizes
+```{r}
+# helper function to compute correlation coefficient including confidence intervals and p-value
+compute_corr <- function(x) {
+  cor_results <- cor.test(x$pred_value, x$EffectSize)
+  cor_coeff <- cor_results$estimate
+  pvalue <- cor_results$p.value
+  conf_int <- as.numeric(cor_results$conf.int)
+  data.frame(cor_coeff, pvalue, conf_int_upper = conf_int[[1]], conf_int_lower = conf_int[[2]],
+             row.names = NULL)
+}
+```
+
+```{r}
+# transform distance to TSS to 1/distance to TSS for correlation analysis
+merged_plot <- merged_plot %>% 
+  mutate(pred_value = if_else(pred_uid == "baseline.distToTSS",
+                              true = log10(1/pred_value),
+                              false = pred_value)) %>% 
+  mutate(pred_name_long = if_else(pred_uid == "baseline.distToTSS",
+                                  true = "log10(1/Distance to TSS)",
+                                  false = pred_name_long))
+
+# compute pearson correlation coefficient of predictor scores vs CRISPR effect size
+pearson_cor <- merged_plot %>% 
+  split(f = merged_plot$pred_name_long) %>% 
+  lapply(FUN = compute_corr) %>% 
+  bind_rows(.id = "pred_name_long") %>% 
+  mutate(pred_name_long = fct_reorder(pred_name_long, cor_coeff, .desc = TRUE))
+
+# get colors for correlation predictors and adapt to new distance name
+pred_colors_cor <- pred_config_main %>% 
+  filter(pred_uid %in% plot_preds) %>% 
+  select(pred_name_long, color) %>% 
+  mutate(pred_name_long = sub("Distance to TSS", "log10(1/Distance to TSS)", pred_name_long)) %>% 
+  deframe()
+
+# plot pearson's correlation coefficients
+crispr_corr <- ggplot(pearson_cor, aes(x = pred_name_long, y = cor_coeff, color = pred_name_long,
+                                fill = pred_name_long)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = conf_int_lower, ymax = conf_int_upper), color = "black", width = 0.2) +
+  labs(y = expression(paste("Pearson's ", rho)),
+       title = "Predictor scores vs. CRISPR effect size", color = "Predictor", fill = "Predictor") +
+  coord_flip() +
+  scale_color_manual(values = pred_colors_cor) +
+  scale_fill_manual(values = pred_colors_cor) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), plot.title = element_text(size = 15, hjust = 1.25),
+        legend.position = "none")
+```
+
+***
+
+## Assemble supplementary figure
+```{r, fig.height=15, fig.width=12}
+# assemble main figure
+plot_grid(
+  dhs_baseline_panel,
+  abc_baseline_panel,
+  plot_grid(prc_pub, performance_pub, rel_widths = c(0.8, 1), labels = c("c", "d")),
+  plot_grid(corr_plot, crispr_corr, nrow = 1, rel_widths = c(1, 0.8), labels = c("e", "f")), 
+  labels = c("a", "b", NA, NA),
+  rel_heights = c(1, 1, 0.8, 0.9),
+  ncol = 1
+)
+
+# save figure to pdf file
+ggsave(filename = "results/manuscript/plots/extended_data_fig2_crispr_benchmarking.pdf",
+       height = 15, width = 12)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

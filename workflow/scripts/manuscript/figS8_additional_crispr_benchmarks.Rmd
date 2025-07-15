@@ -1,0 +1,334 @@
+---
+title: "Supplementary Figure 8: CRISPR benchmarking"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Create plots for CRISPR benchmarking supplementary figure S8.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(rtracklayer)
+library(cowplot)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+source("workflow/scripts/random_gene_pred_functions.R")
+```
+
+***
+
+## Panel A: Precision-recall curves for all CRISPR datasets
+Precision-recall curves are plotted for all 3 CRISPR datasets individually.
+
+```{r loadPRData}
+# load performance summary of main predictors on combined CRISPR data
+perf_main <- fread(snakemake@input$perf_summary)
+
+# load TSS annotations
+tss_annot <- read_tsv(snakemake@input$tss_annot, show_col_types = FALSE, col_select = 1:6)
+
+# create GRanges object with TSS annotations
+tss_annot <- makeGRangesFromDataFrame(tss_annot, seqnames.field = "#chr", keep.extra.columns = TRUE,
+                                      starts.in.df.are.0based = TRUE)
+
+# load list of expressed genes in K562
+expr_genes <- fread(snakemake@input$expr_genes)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_main_benchmarks")
+
+# manually set color of random gene baseline predictor to black
+pred_config <- mutate(pred_config, color = replace(color, pred_col == "randomExprGene", "#000000"))
+
+# load merged data for different datasets
+merged_nasser <- fread(snakemake@input$merged_nasser)
+merged_gasperini <- fread(snakemake@input$merged_gasperini)
+merged_schraivogel <- fread(snakemake@input$merged_schraivogel)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_nasser <- processMergedData(merged_nasser, pred_config = pred_config,
+                                  filter_valid_connections = TRUE,
+                                  include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+merged_gasperini <- processMergedData(merged_gasperini, pred_config = pred_config,
+                                      filter_valid_connections = TRUE,
+                                      include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+merged_schraivogel <- processMergedData(merged_schraivogel, pred_config = pred_config,
+                                        filter_valid_connections = TRUE,
+                                        include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+```
+
+```{r}
+# get expressed TSSs in K562
+expr_tss <- tss_annot[tss_annot$name %in% expr_genes$gene]
+
+# compute precision and recall for random predictors and create rows to add to PR table
+random_pr_nasser <- simulateRandomGenePred(merged_nasser, tss_annot = expr_tss, max_distance = 5e5)
+random_pr_gasperini <- simulateRandomGenePred(merged_gasperini, tss_annot = expr_tss, max_distance = 5e5)
+random_pr_schraivogel <- simulateRandomGenePred(merged_schraivogel, tss_annot = expr_tss, max_distance = 5e5)
+```
+
+```{r}
+# compute precision-recall tables for each dataset
+pr_nasser <- calcPRCurves(merged_nasser, pred_config = pred_config, pos_col = "Regulated")
+pr_gasperini <- calcPRCurves(merged_gasperini, pred_config = pred_config, pos_col = "Regulated")
+pr_schraivogel <- calcPRCurves(merged_schraivogel, pred_config = pred_config, pos_col = "Regulated")
+
+# add random gene PR values to pr tables
+pr_nasser <- bind_rows(pr_nasser, random_pr_nasser)
+pr_gasperini <- bind_rows(pr_gasperini, random_pr_gasperini)
+pr_schraivogel <- bind_rows(pr_schraivogel, random_pr_schraivogel)
+
+# calculate number and percentage of experimental true positives in the CRISPR datasets
+n_pos_nasser <- calcNPos(merged_nasser, pos_col = "Regulated")
+pct_pos_nasser <- calcPctPos(merged_nasser, pos_col = "Regulated")
+n_pos_gasperini <- calcNPos(merged_gasperini, pos_col = "Regulated")
+pct_pos_gasperini <- calcPctPos(merged_gasperini, pos_col = "Regulated")
+n_pos_schraivogel <- calcNPos(merged_schraivogel, pos_col = "Regulated")
+pct_pos_schraivogel <- calcPctPos(merged_schraivogel, pos_col = "Regulated")
+
+# get number of tested enhancer gene pairs in merged data and create title for PR plot
+n_pairs_nasser <- n_distinct(merged_nasser$name)
+pr_title_nasser <- paste0("Nasser et al., 2021", " (", scales::label_comma()(n_pairs_nasser), " pairs)")
+n_pairs_gasperini <- n_distinct(merged_gasperini$name)
+pr_title_gasperini <- paste0("Gasperini et al., 2019", " (", scales::label_comma()(n_pairs_gasperini), " pairs)")
+n_pairs_schraivogel <- n_distinct(merged_schraivogel$name)
+pr_title_schraivogel <- paste0("Schraivogel et al., 2020", " (", scales::label_comma()(n_pairs_schraivogel), " pairs)")
+```
+
+```{r}
+# order main predictors by AUPRC performance on combined CRISPR dataset
+preds_auprc <- pred_config %>%
+  left_join(select(perf_main, pred_uid, AUPRC), by = "pred_uid") %>% 
+  mutate(type = if_else(pred_id == "baseline", true = "baseline", "model")) %>% 
+  mutate(type = factor(type, levels = c("model", "baseline"))) %>% 
+  arrange(type, desc(AUPRC))
+
+# get colors for predictors in plots
+pred_colors <- deframe(select(preds_auprc, pred_name_long, color))
+
+# create PR curve plot
+prc_nasser <- makePRCurvePlot(pr_nasser, n_pos = n_pos_nasser, pct_pos = pct_pos_nasser,
+                             plot_name = pr_title_nasser, pred_config = pred_config,
+                             min_sensitivity = 0.7, line_width = 0.75, point_size = 3,
+                             text_size = 13, colors = pred_colors, plot_thresholds = FALSE) +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+  
+prc_gasperini <- makePRCurvePlot(pr_gasperini, n_pos = n_pos_gasperini,
+                                 pct_pos = pct_pos_gasperini, plot_name = pr_title_gasperini,
+                                 pred_config = pred_config, min_sensitivity = 0.7, line_width = 0.75,
+                                 point_size = 3, text_size = 13, colors = pred_colors,
+                                 plot_thresholds = FALSE) +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+  
+prc_schraivogel <- makePRCurvePlot(pr_schraivogel, n_pos = n_pos_schraivogel,
+                                   pct_pos = pct_pos_schraivogel, plot_name = pr_title_schraivogel,
+                                   pred_config = pred_config, min_sensitivity = 0.7,
+                                   line_width = 0.75, point_size = 3, text_size = 13,
+                                   colors = pred_colors, plot_thresholds = FALSE) +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black")
+
+# add custom plotting theme
+prc_nasser <- prc_nasser + theme_classic() + theme(plot.title = element_text(size = 11))
+prc_gasperini <- prc_gasperini + theme_classic() + theme(plot.title = element_text(size = 11))
+prc_schraivogel <- prc_schraivogel + theme_classic() + theme(plot.title = element_text(size = 11))
+```
+
+```{r}
+# get common legend for panel A
+panel_legend <- get_legend(
+  prc_nasser +
+    theme(legend.text = element_text(size = 10), legend.key.size = unit(0.5, "lines"),
+          legend.text.align = 0)
+)
+
+# create panel A by combining all 3 PRCs
+prcs_all_datasets <- plot_grid(
+  prc_nasser + theme(legend.position="none"),
+  prc_gasperini + theme(legend.position="none"),
+  prc_schraivogel + theme(legend.position="none"),
+  panel_legend,
+  nrow = 1, rel_widths = c(1, 1, 1, 0.75), scale = 0.9)
+```
+
+***
+
+## Panel B: AUPRC as function of overlap
+Plot AURPRC for each predictor as function of the percentage of CRISPR E-G pairs found in prediction
+E-G pairs.
+
+```{r}
+# load merged data for the combined CRISPR dataset
+merged_combined <- fread(snakemake@input$merged_main_preds)
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged_combined <- processMergedData(merged_combined, pred_config = pred_config,
+                                     filter_valid_connections = TRUE,
+                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+
+# compute precision-recall table
+pr_combined <- calcPRCurves(merged_combined, pred_config = pred_config, pos_col = "Regulated")
+```
+
+```{r}
+# compute performance summary for all CRISPR datasets
+perf <- list(
+      combined = pr_combined,
+      nasser = pr_nasser,
+      gasperini = pr_gasperini,
+      schraivogel = pr_schraivogel
+    ) %>% 
+  lapply(FUN = makePRSummaryTable, pred_config = pred_config, min_sensitivity = 0.7) %>% 
+  bind_rows(.id = "dataset")
+
+# extract AUPRC for each predictor in each dataset
+auprc <- select(perf, dataset, pred_uid, pred_name_long, AUPRC)
+
+# function to calculate the percentage of CRISPR E-G pairs also found in each predictor
+compute_pairs_expt_pred <- function(merged) {
+  merged %>% 
+    group_by(pred_uid) %>% 
+    summarize(in_pred = mean(Prediction == 1), .groups = "drop")
+}
+
+# calculate the percentage of CRISPR E-G pairs also found in each predictor and dataset
+pairs_expt_pred <- list(
+      combined = merged_combined,
+      nasser = merged_nasser,
+      gasperini = merged_gasperini,
+      schraivogel = merged_schraivogel
+    ) %>% 
+  lapply(FUN = compute_pairs_expt_pred) %>% 
+  bind_rows(.id = "dataset")
+
+# combine with AUPRC values
+perf_pairs_expt_pred <- left_join(auprc, pairs_expt_pred, by = c("dataset", "pred_uid"))
+
+# exclude baseline distance to TSS and add nice dataset names for plot
+perf_pairs_expt_pred <- perf_pairs_expt_pred %>% 
+  filter(pred_uid != "baseline.distToTSS") %>% 
+  mutate(dataset_long = case_when(
+    dataset == "combined" ~ "Combined CRISPR data",
+    dataset == "nasser" ~ "Nasser et al., 2021",
+    dataset == "gasperini" ~ "Gasperini et al., 2019",
+    dataset == "schraivogel" ~ "Schraivogel et al., 2020") ) %>% 
+  mutate(dataset_long = factor(dataset_long,
+                               levels = c("Combined CRISPR data", "Nasser et al., 2021",
+                                          "Gasperini et al., 2019", "Schraivogel et al., 2020")))
+
+# order predictors by AUPRC performance on combined CRISR data
+perf_comb <- select(filter(perf_pairs_expt_pred, dataset == "combined"), pred_uid, perf_comb = AUPRC)
+perf_pairs_expt_pred <- perf_pairs_expt_pred %>% 
+  left_join(perf_comb, by = "pred_uid") %>% 
+  arrange(dataset, desc(perf_comb)) %>% 
+  mutate(pred_name_long = fct_inorder(pred_name_long))
+
+# plot AUPRC as function of percentage of CRISPR E-G pairs found in predictions
+auprc_pairs <- ggplot(perf_pairs_expt_pred,
+                      aes(x = in_pred, y = AUPRC, color = pred_name_long, shape = dataset_long)) +
+  geom_point(size = 3) +
+  labs(x = "CRISPR E-G pairs in prediction E-G pairs", color = "Predictor",
+       shape = "CRISPR dataset") +
+  scale_color_manual(values = pred_colors) +
+  scale_x_continuous(labels = scales::percent, limits = c(0, 1)) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(legend.text = element_text(size = 6.5), legend.key.size = unit(0.5, "lines"),
+        legend.text.align = 0)
+```
+
+## Panel C: key performance metrics
+```{r}
+# get thresholds @ 70% recall
+perf_combined <- filter(perf, dataset == "combined")
+thresholds <- deframe(select(perf_combined, pred_uid, alpha_at_min_sensitivity))
+
+# convert merged data to wide format for bootstrapping
+merged_combined_bs <- convertMergedForBootstrap(merged_combined, pred_config = pred_config)
+
+# run bootstraps to get 95% intervals for AUPRC and precision at threshold
+auprc <- bootstrapPerformanceIntervals(merged_combined_bs, metric = "auprc", R = 1000, conf = 0.95,
+                                       ci_type = "perc", ncpus = 2)
+precision <- bootstrapPerformanceIntervals(merged_combined_bs, metric = "precision", 
+                                           thresholds = thresholds, R = 1000,
+                                           conf = 0.95, ci_type = "perc", ncpus = 2)
+
+# add pretty predictor names
+auprc <- left_join(auprc, select(pred_config, pred_uid, pred_name_long),
+                   by = c("id" = "pred_uid"))
+precision <- left_join(precision, select(pred_config, pred_uid, pred_name_long),
+                       by = c("id" = "pred_uid"))
+
+# make AUPRC barplot for main predictors
+p1 <- ggplot(auprc, aes(y = fct_reorder(pred_name_long, .x = full), x = full,
+                        fill = pred_name_long)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  labs(title = "Area under PRC", x = "AUPRC", fill = "Predictor") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = pred_colors) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), legend.position = "none",
+        axis.text = element_text(size = 6))
+
+# make precision @ threshold barplot for main predictors
+p2 <- ggplot(precision, aes(y = fct_reorder(pred_name_long, .x = full), x = full,
+                            fill = pred_name_long)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,
+                color = "black") +
+  labs(title = "Precision at 70% recall", x = "Precision", fill = "Predictor") +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_fill_manual(values = pred_colors) +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), legend.position = "none",
+        axis.text = element_text(size = 6))
+
+# arrange plots
+performance <- plot_grid(p1, p2, rel_widths = c(1, 1))
+```
+
+## Assemble CRISPR supplementary figure 1
+```{r, fig.height=8, fig.width=15}
+plot_grid(
+  plot_grid(prcs_all_datasets, labels = "a", label_size = 17),
+  plot_grid(auprc_pairs, performance, labels = c("b", "c"), label_size = 17, rel_widths = c(0.8, 1)),
+  ncol = 1,
+  scale = 0.95
+  )
+
+ggsave(filename = "results/manuscript/plots/figS8_additional_crispr_benchmarks.pdf", height = 8,
+       width = 15)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

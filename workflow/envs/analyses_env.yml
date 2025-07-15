@@ -1,0 +1,29 @@
+name: manuscript_analyses
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - samtools
+  - r-base=4.2.0
+  - r-rmarkdown
+  - r-bookdown
+  - r-r.utils
+  - r-tidyverse
+  - r-ggextra
+  - r-ggpubr
+  - r-ggcorrplot
+  - r-ggrastr
+  - r-cowplot
+  - r-data.table
+  - r-ggcorrplot
+  - r-rocr
+  - r-catools
+  - r-dendextend
+  - r-dt
+  - r-yardstick
+  - bioconductor-genomicranges
+  - bioconductor-rtracklayer
+  - bioconductor-gviz
+  - bioconductor-genomicinteractions
+  - bioconductor-genomicalignments
+  

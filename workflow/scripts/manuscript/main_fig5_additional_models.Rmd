@@ -1,0 +1,200 @@
+---
+title: "Main Figure 5 additional models"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(GenomicRanges)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+```{r}
+# set random seed for bootstrapping
+set.seed(snakemake@params$seed)
+```
+
+## Load input data
+```{r}
+# load performance summary
+perf_summary <- read_tsv(snakemake@input$perf_summary, show_col_types = FALSE)
+
+# load merged data from CRISPR benchmarking pipeline
+merged <- read_tsv(snakemake@input$merged_data, show_col_types = FALSE)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_additional_models_figure")
+
+# load table with additional model features
+model_features <- read_tsv(snakemake@input$model_features, show_col_types = FALSE)
+
+# get model colors from pred_config file
+model_colors <- deframe(select(pred_config, pred_name_long, color))
+```
+
+***
+
+## Plot AUPRC performance for each additional model
+```{r}
+# all DNase-seq based models
+dnase_models <- tibble(
+  name = c("Extended", "DNase + H3K27ac + ENCODE Hi-C", "DNase + ENCODE Hi-C", "DNase + H3K27ac",
+           "DNase-only","Distance to TSS"),
+  model = c("ENCODE_rE2Gext.Score", "ENCODE_rE2GdnaseH3k27acHiC.Score", "ENCODE_rE2GdnaseHiC.Score",
+            "ENCODE_rE2GdnaseH3k27ac.Score", "ENCODE_rE2G.Score", "baseline.distToTSS")
+)
+  
+# create performance table for DNase-seq based models
+dnase_perf <- perf_summary %>% 
+  filter(pred_uid %in% dnase_models$model) %>% 
+  left_join(dnase_models, by = c("pred_uid" = "model")) %>% 
+  left_join(select(pred_config, pred_uid, color), by = "pred_uid") 
+```
+
+```{r}
+# all DNase-seq based models
+atac_models <- tibble(
+  name = c("ATAC + H3K27ac + ENCODE Hi-C", "ATAC + H3K27ac", "ATAC + ENCODE Hi-C",
+           "ATAC-only"),
+  model = c("ENCODE_rE2GatacH3k27acHiC.Score", "ENCODE_rE2GatacH3k27ac.Score",
+            "ENCODE_rE2GatacHiC.Score", "ENCODE_rE2GatacMegamap.Score")
+)
+  
+# create performance table for DNase-seq based models
+atac_perf <- perf_summary %>% 
+  filter(pred_uid %in% atac_models$model) %>% 
+  left_join(atac_models, by = c("pred_uid" = "model")) %>% 
+  left_join(select(pred_config, pred_uid, color), by = "pred_uid") 
+```
+
+```{r}
+# combine performance of all models into one table and order according to overall performance
+perf_all <- bind_rows(DNase = dnase_perf, ATAC = atac_perf, .id = "Type") %>% 
+  arrange(desc(AUPRC)) %>% 
+  mutate(Type = if_else(pred_uid == "baseline.distToTSS", true = "Baseline", false = Type)) %>% 
+  mutate(pred_name_long = fct_inorder(pred_name_long))
+
+# get performance of ENCODE-rE2G models only (no baseline predictor)
+perf_e2g <- filter(perf_all, grepl("^ENCODE_rE2G", pred_uid))
+
+# get AUPRC of baseline distance to TSS predictor
+perf_dist_to_tss <- pull(filter(perf_all, pred_uid == "baseline.distToTSS"), "AUPRC")
+```
+
+```{r}
+# plot overall performance as bar plot
+perf_plot <- ggplot(perf_e2g, aes(x = pred_name_long, y = AUPRC, fill = pred_name_long)) +
+  geom_bar(stat = "identity") + 
+  geom_errorbar(aes(ymin = AUPRC_lowerCi, ymax = AUPRC_upperCi), width = 0.4, color = "black") +
+  geom_hline(yintercept = perf_dist_to_tss, color = model_colors[["Distance to TSS"]],
+             linewidth = 1) +
+  scale_fill_manual(values = model_colors) +
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_classic() +
+  theme(axis.text.x = element_blank(), axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(), legend.position = "none")
+
+# create table with features for each model
+model_features_plot <- model_features %>%
+  pivot_longer(cols = -feature, names_to = "model", values_to = "value") %>% 
+  mutate(feature = factor(feature, levels = rev(model_features$feature))) %>% 
+  mutate(model = factor(model, levels = perf_all$name)) %>% 
+  mutate(value = as.logical(value))
+
+# create feature matrix plot
+feature_plot <- ggplot(model_features_plot, aes(x = model, y = feature, fill = value)) +
+  geom_point(size = 6, shape = 21, color = "darkgray") +
+  scale_fill_manual(values = c("TRUE" = "black", "FALSE" = "white")) +
+  theme_bw() +
+  theme(axis.title = element_blank(), axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        legend.position = "none", panel.grid = element_blank())
+```
+
+```{r, fig.height=6, fig.width=6}
+# assemble plot and save to file
+plot_grid(perf_plot, feature_plot, ncol = 1, rel_heights = c(1, 0.35))
+ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_bar.pdf", height = 6,
+       width = 6)
+```
+
+***
+
+## Plot PRC for each model
+```{r, fig.height=3.5, fig.width=7}
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged <- processMergedData(merged, pred_config = pred_config,
+                            filter_valid_connections = TRUE,
+                            include_missing_predictions = TRUE,
+                            distToTSS_as_kb = TRUE)
+
+# calculate PR
+pr <- calcPRCurves(merged, pred_config = pred_config, pos_col = "Regulated")
+
+# calculate number and percentage of experimental true positives in the experimental dataset
+n_pos <- calcNPos(merged, pos_col = "Regulated")
+pct_pos <- calcPctPos(merged, pos_col = "Regulated")
+
+# make PRC plot
+makePRCurvePlot(pr, n_pos = n_pos, pct_pos = pct_pos, plot_name = "Performance additional models",
+                pred_config = pred_config, min_sensitivity = 0.7, plot_thresholds = FALSE,
+                line_width = 0.8, point_size = 3, text_size = 10, colors = model_colors) +
+  geom_vline(xintercept = 0.7, linetype = "dashed", color = "black") +
+  theme_classic()
+
+# save PRC plot to file
+ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_prc.pdf", height = 3.5,
+       width = 7)
+```
+
+***
+
+## Perform pairwise tests for significance
+
+```{r,fig.height=7, fig.width=10}
+# convert merged data to bootstrapping format
+merged_bs <- convertMergedForBootstrap(merged, pred_config = pred_config)
+
+# compute all pairwise delta bootstraps
+pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = 10000, conf = 0.95,
+                                            ci_type = "perc", ncpus = 4)
+
+# plot bootstrapped delta confidence intervals
+plotBootstrappedIntervals(pw_delta_auprc)
+
+# compute FDR adjusted p-values and split comparisons into individual models
+pw_delta_auprc <- pw_delta_auprc %>% 
+  mutate(pvalue_fdr_adj = p.adjust(pvalue)) %>%
+  separate(id, into = c("model1", "model2"), sep = " \\| ")
+
+# save test results to file
+write_tsv(pw_delta_auprc,
+          file = "results/manuscript/tables/main_fig5_additional_models_pairwise_auprc_comparisons.tsv")
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

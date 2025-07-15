@@ -1,0 +1,66 @@
+## Perform analyses for revised manuscript (revision round 1)
+
+configfile: "config/config.yml"
+
+include: "rules/manuscript.smk"
+include: "rules/WIP.smk"
+
+rule all:
+  input:
+    "results/manuscript/main_fig2_crispr_benchmarking.html",
+    "results/manuscript/main_fig2_heldout_crispr_benchmarking.html",
+    "results/manuscript/main_fig5_additional_models.html",
+    "results/manuscript/assaying_enhancer_activity_figures.html",
+    "results/manuscript/crispr_indirect_effects.html",
+    "results/manuscript/crispr_supplementary_note_S1.1.html",
+    "results/manuscript/extended_data_fig1_feature_correlation.html",
+    "results/manuscript/extended_data_fig2_crispr_benchmarking.html",
+    "results/manuscript/figS8_additional_crispr_benchmarks.html",
+    "results/manuscript/figS9_predictors_vs_crispr_effects.html",
+    "results/manuscript/plots/main_fig5a_prkar2b_features.pdf",
+    "results/manuscript/plots/supp_crispr_locus_plots/hbe1_locus_plot.pdf",
+    "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot.pdf",
+    "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot_zoomed.pdf",
+    "results/manuscript/plots/supp_crispr_locus_plots/gata1_locus_plot.pdf",
+    "results/manuscript/tables/table_S11_baseline_predictors.csv",
+    "results/manuscript/tables/table_s12_performance_summary.csv",
+    "results/manuscript/tables/table_s17_enhancer_activity_files.csv",
+    "results/manuscript/tables/table_s19_indirect_effects.csv",
+    "results/manuscript/tables/table_s19_indirect_effects_1mb.csv"
+
+rule download_genome_annotation:
+  output: "resources/gencode.v29.annotation.gtf.gz"
+  params:
+    url = "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_29/gencode.v29.annotation.gtf.gz"
+  conda: "envs/analyses_env.yml"
+  shell:
+    "wget -O {output} {params.url}"
+    
+rule download_encode_file:
+  output: "resources/{accession}.bed.gz"
+  params:
+    url = "https://www.encodeproject.org/files/{accession}/@@download/{accession}.bed.gz"
+  conda: "envs/analyses_env.yml"
+  shell:
+    "wget -O {output} {params.url}"
+    
+rule download_encode_bigwig:
+  output: "resources/{accession}.bigWig"
+  params:
+    url = "https://www.encodeproject.org/files/{accession}/@@download/{accession}.bigWig"
+  conda: "envs/analyses_env.yml"
+  shell:
+    "wget -O {output} {params.url}"  
+    
+rule download_encode_bam:
+  output:
+    bam = temp(config["scratch_dir"] + "/{accession}.bam"),
+    sorted_bam = config["scratch_dir"] + "/{accession}.sorted.bam",
+    sorted_bai = config["scratch_dir"] + "/{accession}.sorted.bam.bai"
+  params:
+    url = "https://www.encodeproject.org/files/{accession}/@@download/{accession}.bam"
+  conda: "envs/analyses_env.yml"
+  shell:
+    "wget -O {output.bam} {params.url}; "
+    "samtools sort -o {output.sorted_bam} {output.bam}; "
+    "samtools index {output.sorted_bam}"

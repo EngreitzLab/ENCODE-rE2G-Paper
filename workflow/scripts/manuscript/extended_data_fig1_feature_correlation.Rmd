@@ -1,0 +1,72 @@
+---
+title: "Extended Data Fig. 1 - E-G feature correlation"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Create correlation heatmap plot for all ENCODE-rE2G E-G features based the K562 CRISPR training data
+E-G pairs universe.
+
+```{r attachPackages, message=FALSE, warning=FALSE}
+# required packages
+library(tidyverse)
+library(ggpubr)
+library(ggcorrplot)
+```
+
+```{r loadData}
+# load ENCODE-rE2G extended predictions for CRISPR E-G pairs containing all features
+features <- read_tsv(snakemake@input$features, show_col_types = FALSE)
+
+# load feature names for plots
+feature_names <- read_tsv(snakemake@input$feature_names, show_col_types = FALSE)
+```
+
+```{r makeCorrPlot, fig.height=7, fig.width=7}
+# create vector with all feature columns and new names for plot
+feat_cols <- feature_names %>% 
+  filter(column_name %in% colnames(features)) %>% 
+  select(feature_name, column_name) %>% 
+  deframe()
+
+# select feature columns only
+features <- select(features, all_of(feat_cols))
+
+# compute correlation coefficients between predictors for all and positive or negative E-G pairs
+features_cor <- cor(data.matrix(features), method = "spearman", use = "complete.obs")
+
+# plot correlation matrix for all E-G pairs
+ggcorrplot(features_cor, hc.order = TRUE, type = "lower", title = "All CRISPR element-gene pairs",
+           tl.cex = 6)
+```
+
+```{r plotToPDF}
+# plot correlation matrix for all E-G pairs to .pdf file
+outfile <- "results/manuscript/plots/extended_data_fig1_feature_correlation.pdf"
+pdf(outfile, height = 7, width = 7)
+ggcorrplot(features_cor, hc.order = TRUE, type = "lower", title = "All CRISPR element-gene pairs",
+           tl.cex = 6)
+dev.off()
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```
