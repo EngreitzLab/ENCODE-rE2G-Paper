@@ -326,7 +326,8 @@ rule table_s12_performance_summary:
     pred_config_enhAct = config["proj_dir"] + "/predictors/enhancer_activity/results/bigWig/K562/EnhActABC_distal_reg_pred_config_bigWig.tsv"
   output: "results/manuscript/tables/table_s12_performance_summary.csv"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    compute_enhAct_performance = False
   conda: "../envs/analyses_env.yml"  
   threads: 8
   resources:
