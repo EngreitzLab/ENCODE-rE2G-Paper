@@ -45,45 +45,59 @@ rule main_crispr_benchmarks:
     pred_config = config["share_dir"] + "/Predictors/benchmarking_pred_config.tsv"
   output: "results/manuscript/main_crispr_benchmarks.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G"
   script:
     "../scripts/manuscript/main_crispr_benchmarks.Rmd"
 
-# perform indirect effects analyses    
-rule indirect_crispr_effects:
+# additional benchmarks to show performance on different E-G pair classes
+rule additional_crispr_benchmarks:
   input:
-    cis_rates = config["proj_dir"] + "/CRISPR_indirect_effects/results/cis_positive_hit_rates.tsv",
-    trans_rates = config["proj_dir"] + "/CRISPR_indirect_effects/results/trans_positive_hit_rates.tsv",
-    direct_rates_datasets = config["proj_dir"] + "/CRISPR_indirect_effects/results/direct_effect_models/direct_rates_per_datasets.tsv",
-    direct_rates_average  = config["proj_dir"] + "/CRISPR_indirect_effects/results/direct_effect_models/direct_rates_average_across_datasets.tsv",    
-    dataset_ids = config["proj_dir"] + "/CRISPR_indirect_effects/config/crispr_dataset_ids.tsv",
-    direct_effect_models = config["proj_dir"] + "/CRISPR_indirect_effects/results/direct_effect_models/direct_effects_model.rds",
-    merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
-    merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/expt_pred_merged_annot.txt.gz",
-    pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/benchmarking_pred_config_with_alpha.tsv"
-  output: "results/manuscript/indirect_effects.html"
+    merged_data = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
+    pred_config = config["share_dir"] + "/Predictors/benchmarking_pred_config.tsv"
+  output: "results/manuscript/additional_crispr_benchmarks.html"
+  params:
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
-    mem = "32G"  
+    mem = "16G",
+    runtime = "3h"
   script:
-    "../scripts/manuscript/indirect_crispr_effects.Rmd"    
+    "../scripts/manuscript/additional_crispr_benchmarks.Rmd"
+
+# perform indirect effects analyses ## TODO: CLEAN UP 
+# rule indirect_crispr_effects:
+#   input:
+#     cis_rates = config["proj_dir"] + "/CRISPR_indirect_effects/results/encode_analyses/cis_positive_hit_rates.tsv",
+#     trans_rates = config["proj_dir"] + "/CRISPR_indirect_effects/results/encode_analyses/trans_positive_hit_rates_imputed.tsv",
+#     direct_rates_datasets = config["proj_dir"] + "/CRISPR_indirect_effects/results/encode_analyses/direct_effect_models/direct_rates_per_dataset.tsv",
+#     direct_rates_average  = config["proj_dir"] + "/CRISPR_indirect_effects/results/encode_analyses/direct_effect_models/direct_rates_average_across_datasets.tsv",    
+#     dataset_ids = config["proj_dir"] + "/CRISPR_indirect_effects/config/crispr_dataset_ids.tsv",
+#     direct_effect_models = config["proj_dir"] + "/CRISPR_indirect_effects/results/encode_analyses/direct_effect_models/direct_effects_model.rds",
+#     merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
+#     merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/expt_pred_merged_annot.txt.gz",
+#   output: "results/manuscript/indirect_effects.html"
+#   conda: "../envs/analyses_env.yml"
+#   resources:
+#     mem = "16G"  
+#   script:
+#     "../scripts/manuscript/indirect_crispr_effects.Rmd"
     
 # perform benchmarking analyses of main predictors against held-out CRISPR data and make plots for
 # Figure 2 and supplementary material (need to run 'indirect_crispr_effects' first)
 rule heldout_crispr_benchmarks:
   input:
-    indirect_effects = "results/manuscript/tables/crispr_indirect_effects.tsv",
-    perf_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/performance_summary.txt",
-    perf_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/performance_summary.txt",
-    merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
-    merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/expt_pred_merged_annot.txt.gz",
-    pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/benchmarking_pred_config_with_alpha.tsv"
+    pred_config = config["share_dir"] + "/Predictors/benchmarking_pred_config.tsv",
+    merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/CominedTrainingFiltered/expt_pred_merged_annot.txt.gz",
+    merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldoutFiltered/expt_pred_merged_annot.txt.gz"
   output: "results/manuscript/heldout_crispr_benchmarks.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G",
@@ -91,69 +105,7 @@ rule heldout_crispr_benchmarks:
   script:
     "../scripts/manuscript/heldout_crispr_benchmarks.Rmd"
 
-# compare cross-validated vs. non-cross-validated ENCODE-rE2G models to check for overfitting    
-rule overfit_check:
-  input:
-    perf = config["proj_dir"] + "/CRISPR_benchmarks/results/OverfitCheck/performance_summary.txt",
-    merged = config["proj_dir"] + "/CRISPR_benchmarks/results/OverfitCheck/expt_pred_merged_annot.txt.gz",
-    pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/overfit_check_pred_config.tsv"
-  output: "results/manuscript/overfit_check.html"
-  conda: "../envs/analyses_env.yml"
-  script:
-    "../scripts/manuscript/overfit_check.Rmd"  
-    
-
-    
-# # perform benchmarking analyses of main predictors against held-out CRISPR data and make plots for
-# # Figure 2 and supplementary material
-# rule heldout_crispr_benchmarks:
-#   input:
-#     perf_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/performance_summary.txt",
-#     perf_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/performance_summary.txt",
-#     merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
-#     merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldout/expt_pred_merged_annot.txt.gz",
-#     pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/benchmarking_pred_config_with_alpha.tsv",
-#     crispr_training = config["share_dir"] + "/CRISPR_data/element_classes/EPCrisprBenchmark_combined_training_element_classes.tsv.gz",
-#     crispr_heldout = config["share_dir"] + "/CRISPR_data/element_classes/EPCrisprBenchmark_combined_heldout_element_classes.tsv.gz",
-#   output: "results/manuscript/heldout_crispr_benchmarks.html"
-#   params:
-#     seed = config["seed"]
-#   conda: "../envs/analyses_env.yml"
-#   resources:
-#     mem = "16G",
-#     runtime = "3h"
-#   script:
-#     "../scripts/manuscript/heldout_crispr_benchmarks.Rmd"
-
-
-
-
-
-rule additional_analyses_heldout_crispr_benchmarking:
-  input:
-    perf_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/performance_summary.txt",
-    perf_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldoutDownsampledH3K27me3CTCF/performance_summary.txt",
-    merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
-    merged_heldout = config["proj_dir"] + "/CRISPR_benchmarks/results/CombinedHeldoutDownsampledH3K27me3CTCF/expt_pred_merged_annot.txt.gz",
-    pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/benchmarking_pred_config_with_alpha.tsv",
-    crispr_training = config["share_dir"] + "/CRISPR_data/element_classes/EPCrisprBenchmark_combined_training_element_classes.tsv.gz",
-    crispr_heldout = config["share_dir"] + "/CRISPR_data/element_classes/EPCrisprBenchmark_combined_heldout_element_classes.tsv.gz",
-    crispr_heldout_downsampled = config["share_dir"] + "/CRISPR_data/element_classes/EPCrisprBenchmark_combined_heldout_element_classes.CTCF_H3K27me3_downsampled.tsv.gz",
-    ubiquitously_expressed = "resources/Ubiquitous_expression.txt"
-  output: "results/manuscript/additional_analyses_heldout_crispr_benchmarking.html"
-  params:
-    seed = config["seed"]
-  conda: "../envs/analyses_env.yml"
-  resources:
-    mem = "16G",
-    runtime = "8h"
-  script:
-    "../scripts/manuscript/additional_analyses_heldout_crispr_benchmarking.Rmd"    
-  
-  
-  
-  
-    
+# make locus plot for Figure 4 
 rule main_fig4e_gwas_locus:
   input:
     e2g_metadata = config["share_dir"] + "/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_metadata.tsv",
@@ -161,6 +113,7 @@ rule main_fig4e_gwas_locus:
   output: "results/manuscript/main_fig4e_gwas_locus.html"
   params:
     seed = config["seed"],
+    scratch_dir = config["scratch_dir"],
     filter_links_locus = True
   conda: "../envs/analyses_env.yml"
   resources:
@@ -168,6 +121,7 @@ rule main_fig4e_gwas_locus:
   script:
     "../scripts/manuscript/main_fig4e_gwas_locus.Rmd"
 
+# plot performance of ENCODE-rE2G models with additional assays for main figure 5
 rule main_fig5_additional_models:
   input:
     perf_summary = config["proj_dir"] + "/CRISPR_benchmarks/results/AdditionalModels/performance_summary.txt",
@@ -176,13 +130,29 @@ rule main_fig5_additional_models:
     model_features = "resources/additional_model_features.tsv"
   output: "results/manuscript/main_fig5_additional_models.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G"
   script:
     "../scripts/manuscript/main_fig5_additional_models.Rmd"
+
+# analyses performance differences of additional ENCODE-rE2G models for supplementary materials   
+rule extended_data_fig3_additional_models:
+  input:
+    merged_data = config["proj_dir"] + "/CRISPR_benchmarks/results/AdditionalModelsAnalysis/expt_pred_merged_annot.txt.gz",
+    pred_config = config["proj_dir"] + "/CRISPR_benchmarks/config/predictor_config_files/additional_models_pred_config.tsv"
+  output: "results/manuscript/extended_data_fig3_additional_models.html"
+  params:
+    seed = config["seed"]
+  conda: "../envs/analyses_env.yml"
+  resources:
+    mem = "16G"
+  script:
+    "../scripts/manuscript/extended_data_fig3_additional_models.Rmd"
     
+# make figures for assessing the performance of different chromatin assays in ABC    
 rule assaying_enhancer_activity_figures:
   input:
     metadata_bigwig = config["proj_dir"] + "/predictors/enhancer_activity/resources/processed_encode_chromatin_metadata_bigWig.tsv.gz",
@@ -190,33 +160,32 @@ rule assaying_enhancer_activity_figures:
     pred_config = config["proj_dir"] + "/predictors/enhancer_activity/results/bigWig/K562/EnhActABC_distal_reg_pred_config_bigWig.tsv",
   output: "results/manuscript/assaying_enhancer_activity_figures.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G"  
   script:
     "../scripts/manuscript/assaying_enhancer_activity_figures.Rmd"
 
-rule crispr_supplementary_note_S1_1:
-  input:
-    gasp_crispr = config["share_dir"] + "/CRISPR_data/EPCrisprBenchmark_Gasperini2019_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz",
-    schrai_crispr = config["share_dir"] + "/CRISPR_data/EPCrisprBenchmark_TAPseq_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz",
-    combined_crispr = config["share_dir"] + "/CRISPR_data/EPCrisprBenchmark_ensemble_data_GRCh38.tsv.gz",
-    heldout_crispr = "/oak/stanford/groups/engreitz/Users/jgalante/ENCODE_Sceptre_Analysis/results/analyze_validation_datasets/subset_upsampling_analysis/expt_pred_merged_annot/labelled_combined_validation_expt_pred_merged_annot.txt",
-    gene_universe = config["proj_dir"] + "/CRISPR_benchmarks/resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed",
-    merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz"
-  output: "results/manuscript/crispr_supplementary_note_S1.1.html"
-  params:
-    seed = config["seed"]
-  conda: "../envs/analyses_env.yml"
-  resources:
-    mem = "16G"
-  script:
-    "../scripts/manuscript/crispr_supplementary_note_S1.1.Rmd"
+## TODO: FIX THIS
+# rule crispr_supplementary_note_S1_1:
+#   input:
+#     gasp_crispr = config["share_dir"] + "/CRISPR_data/EPCrisprBenchmark_Gasperini2019_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz",
+#     schrai_crispr = config["share_dir"] + "/CRISPR_data/EPCrisprBenchmark_TAPseq_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz",
+#     combined_crispr = config["share_dir"] + "/CRISPR_data/indirect_effects/formatted/EPCrisprBenchmark.combined_training.annotated.tsv.gz",
+#     gene_universe = config["proj_dir"] + "/CRISPR_benchmarks/resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed",
+#     merged_training = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz"
+#   output: "results/manuscript/crispr_supplementary_note_S1.1.html"
+#   params:
+#     seed = config["seed"]
+#   conda: "../envs/analyses_env.yml"
+#   resources:
+#     mem = "16G"
+#   script:
+#     "../scripts/manuscript/crispr_supplementary_note_S1_1.Rmd"
 
-
-
-
+# plot correlation between ENCODE-rE2G features
 rule extended_data_fig1_feature_correlation:
   input:
     features = config["share_dir"] + "/Predictors/ENCODE-rE2G/additional_models/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv",
@@ -241,7 +210,8 @@ rule extended_data_fig2_crispr_benchmarking:
     merged_main_preds = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz",
   output: "results/manuscript/extended_data_fig2_crispr_benchmarking.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G"
@@ -260,7 +230,8 @@ rule figS8_additional_crispr_benchmarks:
     merged_main_preds = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/expt_pred_merged_annot.txt.gz"
   output: "results/manuscript/figS8_additional_crispr_benchmarks.html"
   params:
-    seed = config["seed"]
+    seed = config["seed"],
+    bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "16G"
@@ -318,6 +289,19 @@ rule supplementary_fig_locus_plots:
   script:
     "../scripts/manuscript/supplementary_fig_locus_plots.R"    
 
+rule table_s2_encode_re2g_metadata:
+  input:
+    e2g_meta = config["share_dir"] + "/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_metadata.tsv",
+    e2g_portal_meta = "resources/encode_re2g_portal_accessions_20250812.tsv",
+    extended_assays = "resources/encode_re2g_extended_assays.tsv"
+  output:
+    dnase_table = "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions.csv",
+    extended_table = "results/manuscript/tables/table_s2_metadata_encode_re2g_ext_predictions.csv",
+    combined_table = "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions_combined.csv"
+  conda: "../envs/analyses_env.yml" 
+  script:
+    "../scripts/manuscript/table_s2_encode_re2g_metadata.R"
+
 rule table_s11_baseline_predictors:
   input:
     input_files = config["proj_dir"] + "/predictors/baseline_predictors/config/e2g_baseline_preds_input_files_bam.tsv",
@@ -331,7 +315,7 @@ rule table_s11_baseline_predictors:
     mem = "16G"
   script:
      "../scripts/manuscript/table_s11_baseline_predictors.R"
-     
+ 
 rule table_s12_performance_summary:
   input:
     main_perf_summary = config["proj_dir"] + "/CRISPR_benchmarks/results/MainPredictors/performance_summary.txt",
@@ -350,7 +334,7 @@ rule table_s12_performance_summary:
     runtime = "6h"
   script:
      "../scripts/manuscript/table_s12_performance_summary.R"
-     
+  
 rule table_s17_enhancer_activity_files:
   input: config["proj_dir"] + "/predictors/enhancer_activity/resources/processed_encode_chromatin_metadata_bigWig.tsv.gz"
   output: "results/manuscript/tables/table_s17_enhancer_activity_files.csv"
@@ -359,18 +343,21 @@ rule table_s17_enhancer_activity_files:
     mem = "16G"
   script:
      "../scripts/manuscript/table_s17_enhancer_activity_files.R"
-     
-rule table_s19_indirect_effects:
-  input: 
-    Gasperini2019 = "results/additional_analyses/indirect_effects_proportions_gasperini.csv",
-    K562_random_screen = config["proj_dir"] + "/analyses/revision_round1/heldout_crispr_indirect_effects/results/DC_TAP/indirect_effects_proportions.csv",
-    Klann2021 = config["proj_dir"] + "/analyses/revision_round1/heldout_crispr_indirect_effects/results/Klann/indirect_effects_proportions.csv",
-    Morris2023_v1 = config["proj_dir"] + "/analyses/revision_round1/heldout_crispr_indirect_effects/results/Morrisv1/indirect_effects_proportions.csv",
-    Morris2023_v2 = config["proj_dir"] + "/analyses/revision_round1/heldout_crispr_indirect_effects/results/Morrisv2/indirect_effects_proportions.csv",
-    Xie2019 = config["proj_dir"] + "/analyses/revision_round1/heldout_crispr_indirect_effects/results/Xie/indirect_effects_proportions.csv"
-  output:
-    stats_all_dist = "results/manuscript/tables/table_s19_indirect_effects.csv",
-    stats_1mb_dist = "results/manuscript/tables/table_s19_indirect_effects_1mb.csv"
-  conda: "../envs/analyses_env.yml"  
+
+rule table_s18_encode_re2g_stats_per_experiment:
+  input: config["encode_re2g_predictions"]["thresholded"].values()
+  output: "results/manuscript/tables/table_s18_encode_re2g_stats_per_experiment.csv"
+  threads: 10
+  conda: "../envs/analyses_env.yml"
   script:
-     "../scripts/manuscript/table_s19_indirect_effects.R"
+    "../scripts/manuscript/table_s18_encode_re2g_stats_per_experiment.R"
+  
+rule table_s19_encode_re2g_stats_per_gene:
+  input: 
+    genes = config["proj_dir"] + "/CRISPR_benchmarks/resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed",
+    pred = config["encode_re2g_predictions"]["thresholded"].values()
+  output: "results/manuscript/tables/table_s19_encode_re2g_stats_per_gene.csv"
+  threads: 10
+  conda: "../envs/analyses_env.yml"
+  script:
+    "../scripts/manuscript/table_s19_encode_re2g_stats_per_gene.R"

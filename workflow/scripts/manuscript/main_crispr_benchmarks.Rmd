@@ -15,6 +15,9 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# number for iterations (resamplings) for bootstrapping analyses
+boot_iter <- snakemake@params$bootstrap_iterations
 ```
 
 ## Goal
@@ -242,7 +245,7 @@ thresholds.
 merged_bs <- convertMergedForBootstrap(merged, pred_config = pred_config)
 
 # compute all pairwise delta bootstraps
-pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = 10000, conf = 0.95,
+pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = boot_iter, conf = 0.95,
                                             ci_type = "perc", ncpus = 4)
 
 # plot bootstrapped delta confidence intervals
@@ -262,7 +265,7 @@ thresholds <- perf %>%
 
 # compute all pairwise delta bootstraps
 pw_delta_prec <- bootstrapDeltaPerformance(merged_bs, metric = "precision",
-                                           thresholds = thresholds, R = 10000, conf = 0.95,
+                                           thresholds = thresholds, R = boot_iter, conf = 0.95,
                                            ci_type = "perc", ncpus = 4)
 
 # plot bootstrapped delta confidence intervals

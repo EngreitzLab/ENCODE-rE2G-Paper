@@ -61,8 +61,7 @@ merged_dhs <- fread(snakemake@input$merged_baseline_dhs)
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_dhs <- processMergedData(merged_dhs, pred_config = pred_config_bl,
-                                filter_valid_connections = TRUE,
-                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                filter_valid_connections = TRUE, include_missing_predictions = TRUE)
 ```
 
 ```{r}
@@ -204,8 +203,7 @@ merged_abc <- fread(snakemake@input$merged_baseline_abc)
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_abc <- processMergedData(merged_abc, pred_config = pred_config_bl,
-                                filter_valid_connections = TRUE,
-                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                filter_valid_connections = TRUE, include_missing_predictions = TRUE)
 ```
 
 ```{r}
@@ -320,8 +318,7 @@ pred_config_pub <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_pub <- processMergedData(merged_pub, pred_config = pred_config_pub,
-                                filter_valid_connections = TRUE,
-                                include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                filter_valid_connections = TRUE, include_missing_predictions = TRUE)
 ```
 
 ```{r}
@@ -379,11 +376,13 @@ thresholds_pub <- deframe(select(perf_summary_pub, pred_uid, alpha_at_min_sensit
 merged_pub_bs <- convertMergedForBootstrap(merged_pub, pred_config = pred_config_pub)
 
 # run bootstraps to get 95% intervals for AUPRC and precision at threshold
-auprc_pub <- bootstrapPerformanceIntervals(merged_pub_bs, metric = "auprc", R = 1000, conf = 0.95,
+auprc_pub <- bootstrapPerformanceIntervals(merged_pub_bs, metric = "auprc", conf = 0.95,
+                                           R = snakemake@params$bootstrap_iterations,
                                            ci_type = "perc", ncpus = 2)
 precision_pub <- bootstrapPerformanceIntervals(merged_pub_bs, metric = "precision", 
-                                               thresholds = thresholds_pub, R = 1000,
-                                               conf = 0.95, ci_type = "perc", ncpus = 2)
+                                               thresholds = thresholds_pub, conf = 0.95,
+                                               R = snakemake@params$bootstrap_iterations,
+                                               ci_type = "perc", ncpus = 2)
 
 # add pretty predictor names
 auprc_pub <- left_join(auprc_pub, select(pred_config_pub, pred_uid, pred_name_long),
@@ -432,8 +431,8 @@ pred_config_main <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_main <- processMergedData(merged_main, pred_config = pred_config_main,
-                                     filter_valid_connections = TRUE,
-                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                 filter_valid_connections = TRUE,
+                                 include_missing_predictions = TRUE)
 
 # list of predictors to show in supplementary plots
 plot_preds <- grep("baseline", x = pred_config_main$pred_uid, invert = TRUE, value = TRUE)

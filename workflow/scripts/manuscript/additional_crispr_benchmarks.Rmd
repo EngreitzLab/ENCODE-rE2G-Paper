@@ -1,0 +1,338 @@
+---
+title: "Additional ENCODE-rE2G CRISPR benchmarks"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+
+# number for iterations (resamplings) for bootstrapping analyses
+boot_iter <- snakemake@params$bootstrap_iterations
+```
+
+## Goal
+Benchmark ENCODE-rE2G and other E-G models against combined K562 CRISPR data and investigate the
+performance on different categories of E-G pairs to better understand the model performance.
+```{r attachPackages, message=FALSE, warning=FALSE}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(GenomicRanges)
+library(ROCR)
+library(caTools)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+***
+
+## Load and process input data
+Load and process output from CRISPR benchmarking pipeline.
+```{r loadData}
+# load merged data for the combined CRISPR dataset
+merged <- fread(snakemake@input$merged_data)
+
+# load pred_config file
+pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
+                                include_col = "crispr_main_benchmarks")
+
+# process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
+merged <- processMergedData(merged, pred_config = pred_config,
+                            filter_valid_connections = TRUE,
+                            include_missing_predictions = TRUE)
+
+# colors to use for predictors in plots
+pred_colors <- deframe(select(pred_config, pred_name_long, color))
+```
+
+***
+
+## E-G classes
+Investigate the performance of ENCODE-rE2G on different classes of E-G pairs
+```{r}
+# predictors for which to compute performance as function on different E-G classes
+class_preds <- c("ENCODE_rE2G.Score", "ENCODE_rE2Gext.Score", "ABCfull.ABC.Score",
+                 "baseline.distToTSS")
+
+# order to show predictors in plots
+pred_order <- c("ENCODE-rE2G_Extended", "ENCODE-rE2G", "ABC_A=DNase x H3K27ac, C=ENCODE Hi-C",
+                "Distance to TSS")
+```
+
+```{r}
+# function to compute performance for two classes
+compute_performance_eg_classes <- function(merged, class1_col, class2_col, class1_name,
+                                           class2_name, pred_config, predictors, boot_iter) {
+  
+  # extract data for classes and convert to format for bootstrapping
+  merged_class1 <- convertMergedForBootstrap(filter(merged, !!sym(class1_col)), pred_config)
+  merged_class2 <- convertMergedForBootstrap(filter(merged, !!sym(class2_col)), pred_config)
+  
+  # count the number of pairs for each class
+  pairs <- bind_rows(merged_class1, merged_class2, .id = "class") %>% 
+    group_by(class) %>% 
+    summarize(pos = sum(Regulated == TRUE), pairs = n(), pos_rate = pos / pairs * 100) %>% 
+    mutate(perc_pos = pos / sum(pos) * 100)
+  
+  # compute performance per class
+  perf_class1 <- bootstrapPerformanceIntervals(merged_class1, metric = "auprc",
+                                               predictors = predictors, R = boot_iter)
+  perf_class2 <- bootstrapPerformanceIntervals(merged_class2, metric = "auprc",
+                                               predictors = predictors, R = boot_iter)
+  
+  # combine performance into one table, and add predictor names to show in plots and crispr pairs
+  perf_classes <- bind_rows(perf_class1, perf_class2, .id = "class") %>% 
+    left_join(select(pred_config, id = pred_uid, pred_name_long), by = "id") %>% 
+    left_join(pairs, by = "class")
+  
+  # set specified names for classes
+  perf_classes <- perf_classes %>% 
+    mutate(class = if_else(class == "1", true = class1_name, false = class2_name))
+
+  return(perf_classes)
+  
+}
+```
+
+#### Distance to TSS
+Calculate performance for E-G pairs below or above 100kb from gene TSS.
+```{r}
+# label pairs within or above 100kb in two separeate class columns
+merged_dist_class <- merged %>% 
+  mutate(dist_100kb = distanceToTSS <= 1e5,
+         dist_gt_100kb = distanceToTSS > 1e5)
+
+# compute performance for distance classes
+perf_dist <- compute_performance_eg_classes(merged_dist_class, class1_col = "dist_100kb",
+                                            class2_col = "dist_gt_100kb", class1_name = "<=100kb",
+                                            class2_name = ">100kb", pred_config = pred_config,
+                                            predictors = class_preds, boot_iter = boot_iter)
+
+# add class labels for plot and make predictors and classes ordered factors
+perf_dist <- perf_dist %>% 
+    mutate(class_label = paste0(class, "\npositives: ", pos, "\npairs: ", pairs, "\npos. rate: ",
+                                round(pos_rate, digits = 1), "%")) %>%
+    mutate(class_label = fct_rev(class_label)) %>% 
+    mutate(pred_name_long = factor(pred_name_long, levels = rev(pred_order)))
+
+# plot performance across predictors and classes
+p_dist <- ggplot(perf_dist, aes(x = full, y = pred_name_long, color = pred_name_long,
+                                fill = pred_name_long, alpha = class_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper, group = class_label),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(alpha = "Distance to TSS", x = "AUPRC") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none", fill = "none") +
+  theme_classic() +
+  theme(legend.position = "top", axis.title.y = element_blank())
+```
+
+#### Probability direct effects
+Calculate performance for E-G pairs below or above 0.9 probability to be direct effects.
+```{r}
+# label pairs below or above a probability of being direct effects of 0.9
+merged_direct_class <- merged %>% 
+  mutate(p_direct_90 = direct_vs_indirect_negative <= 0.9,
+         p_direct_gt_90 = direct_vs_indirect_negative > 0.9)
+
+# compute performance for distance classes
+perf_direct <- compute_performance_eg_classes(merged_direct_class, class1_col = "p_direct_90",
+                                              class2_col = "p_direct_gt_90", class1_name = "<=0.9",
+                                              class2_name = ">0.9", pred_config = pred_config,
+                                              predictors = class_preds, boot_iter = boot_iter)
+
+# add class labels for plot and make predictors and classes ordered factors
+perf_direct <- perf_direct %>% 
+    mutate(class_label = paste0(class, "\npositives: ", pos, "\npairs: ", pairs, "\npos. rate: ",
+                                round(pos_rate, digits = 1), "%")) %>%
+    mutate(pred_name_long = factor(pred_name_long, levels = rev(pred_order)))
+
+# plot performance across predictors and classes
+p_direct <- ggplot(perf_direct, aes(x = full, y = pred_name_long, color = pred_name_long,
+                                    fill = pred_name_long, alpha = class_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper, group = class_label),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(alpha = "Probability direct effects", x = "AUPRC") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none", fill = "none") +
+  theme_classic() +
+  theme(legend.position = "top", axis.title.y = element_blank())
+```
+
+#### CRISPR effect size
+Calculate performance for CRISPR positives with below or above 5% CRISPR effect size. 
+```{r}
+# label CRISPR positives that have an effect size below or above 5%
+merged_es_class <- merged %>% 
+  mutate(effect_size_5 = (Regulated == FALSE | abs(EffectSize) <= 0.05),
+         effect_size_gt_5 = (Regulated == FALSE | abs(EffectSize) > 0.05))
+
+# compute performance for effect size classes
+perf_es <- compute_performance_eg_classes(merged_es_class, class1_col = "effect_size_5",
+                                          class2_col = "effect_size_gt_5", class1_name = "<=5%",
+                                          class2_name = ">5%", pred_config = pred_config,
+                                          predictors = class_preds, boot_iter = boot_iter)
+
+# add class labels for plot and make predictors ordered factors
+perf_es <- perf_es %>% 
+    mutate(class_label = paste0(class, "\npositives: ", pos, "\npairs: ", pairs, "\n% of positives: ",
+                                round(perc_pos, digits = 1))) %>%
+    mutate(pred_name_long = factor(pred_name_long, levels = rev(pred_order)))
+
+# plot performance across predictors and classes
+p_es <- ggplot(perf_es, aes(x = full, y = pred_name_long, color = pred_name_long,
+                                fill = pred_name_long, alpha = class_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper, group = class_label),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(alpha = "CRISPR effect size", x = "AUPRC") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none", fill = "none") +
+  theme_classic() +
+  theme(legend.position = "top", axis.title.y = element_blank())
+```
+
+#### H3K27ac levels
+Calculate performance for elements with or without H3K27ac signal.
+```{r}
+# label CRISPR positives that overlap or do not overlap H3K27ac peaks
+merged_h3k27ac_class <- merged %>% 
+#  filter(elementChromatinCategory %in% c("No H3K27ac", "H3K27ac", "High H3K27ac")) %>% 
+  mutate(no_h3k27ac = !elementChromatinCategory %in% c("H3K27ac", "High H3K27ac"),
+         h3k27ac = elementChromatinCategory %in% c("H3K27ac", "High H3K27ac"))
+
+# compute performance for H3K27ac classes
+perf_h3k27ac <- compute_performance_eg_classes(merged_h3k27ac_class, class1_col = "no_h3k27ac",
+                                               class2_col = "h3k27ac", class1_name = "No H3K27ac",
+                                               class2_name = "H3K27ac peak",
+                                               pred_config = pred_config, predictors = class_preds,
+                                               boot_iter = boot_iter)
+
+# add class labels for plot and make predictors and classes ordered factors
+perf_h3k27ac <- perf_h3k27ac %>% 
+    mutate(class_label = paste0(class, "\npositives: ", pos, "\npairs: ", pairs, "\npos. rate: ",
+                                round(pos_rate, digits = 1), "%")) %>%
+    mutate(class_label = fct_rev(class_label)) %>% 
+    mutate(pred_name_long = factor(pred_name_long, levels = rev(pred_order)))
+
+# plot performance across predictors and classes
+p_h3k27ac <- ggplot(perf_h3k27ac, aes(x = full, y = pred_name_long, color = pred_name_long,
+                                fill = pred_name_long, alpha = class_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper, group = class_label),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(alpha = "H3K27ac at enhancer", x = "AUPRC") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none", fill = "none") +
+  theme_classic() +
+  theme(legend.position = "top", axis.title.y = element_blank())
+```
+
+#### Gene class
+Calculate performance for ubiquitously and non-ubiquitously expressed genes.
+```{r}
+# label pairs based on target gene class
+merged_gene_class <- merged %>% 
+  mutate(ubiq_gene = measuredGeneUbiquitousExpressed == TRUE,
+         other_gene = measuredGeneUbiquitousExpressed == FALSE)
+
+# compute performance for target gene classes
+perf_gene_class <- compute_performance_eg_classes(merged_gene_class, class1_col = "ubiq_gene",
+                                                  class2_col = "other_gene",
+                                                  class1_name = "Ubiquitously expressed",
+                                                  class2_name = "Other",
+                                                  pred_config = pred_config, predictors = class_preds,
+                                                  boot_iter = boot_iter)
+
+# add class labels for plot and make predictors and classes ordered factors
+perf_gene_class <- perf_gene_class %>% 
+    mutate(class_label = paste0(class, "\npositives: ", pos, "\npairs: ", pairs, "\npos. rate: ",
+                                round(pos_rate, digits = 1), "%")) %>%
+    mutate(class_label = fct_rev(class_label)) %>% 
+    mutate(pred_name_long = factor(pred_name_long, levels = rev(pred_order)))
+
+# plot performance across predictors and classes
+gene_class <- ggplot(perf_gene_class, aes(x = full, y = pred_name_long, color = pred_name_long,
+                                fill = pred_name_long, alpha = class_label)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(xmin = lower, xmax = upper, group = class_label),
+                position = position_dodge(0.9), width = 0.4, color = "black", alpha = 1) +
+  labs(alpha = "Target gene class", x = "AUPRC") +
+  scale_color_manual(values = pred_colors) +
+  scale_fill_manual(values = pred_colors) +
+  scale_alpha_manual(values = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1)) +
+  guides(color = "none", fill = "none") +
+  theme_classic() +
+  theme(legend.position = "top", axis.title.y = element_blank())
+```
+
+## Create figure
+Arrange plots into figure panel for supplementary materials.
+```{r fig.height=4.5, fig.width=18}
+# arrange plots into one figure
+plot_grid(
+  p_dist,
+  p_es + theme(axis.text.y = element_blank()),
+  p_h3k27ac + theme(axis.text.y = element_blank()),
+  gene_class + theme(axis.text.y = element_blank()),
+  nrow = 1,
+  rel_widths = c(1, 0.61, 0.61, 0.61)
+)
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/crispr_performance_eg_classes.pdf", height = 4.5,
+       width = 18)
+```
+
+```{r fig.height=4.5, fig.width=18}
+# arrange plots into one figure
+plot_grid(
+  p_direct,
+  p_es + theme(axis.text.y = element_blank()),
+  p_h3k27ac + theme(axis.text.y = element_blank()),
+  gene_class + theme(axis.text.y = element_blank()),
+  nrow = 1,
+  rel_widths = c(1, 0.61, 0.61, 0.61)
+)
+
+# save plot to pdf
+ggsave(filename = "results/manuscript/plots/crispr_performance_eg_classes_pdirect.pdf",
+       height = 4.5, width = 18)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

@@ -142,10 +142,8 @@ ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_bar.pdf"
 ## Plot PRC for each model
 ```{r, fig.height=3.5, fig.width=7}
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
-merged <- processMergedData(merged, pred_config = pred_config,
-                            filter_valid_connections = TRUE,
-                            include_missing_predictions = TRUE,
-                            distToTSS_as_kb = TRUE)
+merged <- processMergedData(merged, pred_config = pred_config, filter_valid_connections = TRUE,
+                            include_missing_predictions = TRUE)
 
 # calculate PR
 pr <- calcPRCurves(merged, pred_config = pred_config, pos_col = "Regulated")
@@ -175,7 +173,8 @@ ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_prc.pdf"
 merged_bs <- convertMergedForBootstrap(merged, pred_config = pred_config)
 
 # compute all pairwise delta bootstraps
-pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = 10000, conf = 0.95,
+pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", conf = 0.95,
+                                            R = snakemake@params$bootstrap_iterations,
                                             ci_type = "perc", ncpus = 4)
 
 # plot bootstrapped delta confidence intervals

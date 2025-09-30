@@ -52,19 +52,19 @@ pred_config <- importPredConfig(snakemake@input$pred_config, expr = TRUE,
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_combined <- processMergedData(merged_combined, pred_config = pred_config,
                                      filter_valid_connections = TRUE,
-                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                     include_missing_predictions = TRUE)
 
 merged_nasser <- processMergedData(merged_nasser, pred_config = pred_config,
                                   filter_valid_connections = TRUE,
-                                  include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                  include_missing_predictions = TRUE)
 
 merged_gasperini <- processMergedData(merged_gasperini, pred_config = pred_config,
                                       filter_valid_connections = TRUE,
-                                      include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                      include_missing_predictions = TRUE)
 
 merged_schraivogel <- processMergedData(merged_schraivogel, pred_config = pred_config,
                                         filter_valid_connections = TRUE,
-                                        include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                        include_missing_predictions = TRUE)
 ```
 
 ```{r, warning=FALSE}

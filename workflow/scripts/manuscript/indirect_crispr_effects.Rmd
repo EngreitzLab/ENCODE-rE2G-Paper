@@ -10,9 +10,6 @@ output:
 ---
 
 ```{r setupDocument, include=FALSE}
-# save.image("indirect_effects.rda")
-# stop()
-
 # set output html chunk options
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
@@ -52,11 +49,20 @@ direct_effect_models <- readRDS(snakemake@input$direct_effect_models)
 merged_training <- read_tsv(snakemake@input$merged_training, show_col_types = FALSE)
 merged_heldout  <- read_tsv(snakemake@input$merged_heldout,  show_col_types = FALSE)
 
-# extract CRISPR E-G pairs from merged data
+# predictor related columns added to CRISPR data by benchmarking pipeline
 benchmark_cols <- c("expressed", "PredictionCellType", "pred_elements", "pred_uid", "pred_id",
-                    "pred_col", "pred_value", "Prediction")   
-crispr_training <- distinct(select(merged_training, -any_of(benchmark_cols)))
-crispr_heldout  <- distinct(select(merged_heldout,  -any_of(benchmark_cols)))
+                    "pred_col", "pred_value", "Prediction")
+
+# extract data on CRISPR E-G pairs only from merged data
+crispr_training <- merged_training %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  mutate(dist_to_tss = pred_value) %>% 
+  select(-any_of(benchmark_cols))
+
+crispr_heldout <- merged_heldout %>% 
+  filter(pred_uid == "baseline.distToTSS") %>% 
+  mutate(dist_to_tss = pred_value) %>% 
+  select(-any_of(benchmark_cols))
 
 # load file used to convert dataset ids in CRISPR data files to ids in indirect effects analyses
 datasets <- read_tsv(snakemake@input$dataset_ids, show_col_types = FALSE)
@@ -65,7 +71,7 @@ datasets <- rename(datasets, indirect_effects_dataset = dataset, Dataset = datas
 # combine all CRISPR data into one table and add dataset ids for indirect effects analyses
 crispr <- bind_rows(training = crispr_training, heldout = crispr_heldout, .id = "dataset_type") %>% 
   left_join(datasets, by = "Dataset") %>% 
-  mutate(dataset_plots = factor(dataset_plots, levels = datasets$dataset_plots))
+  mutate(dataset_plots = factor(dataset_plots, levels = unique(datasets$dataset_plots)))
 ```
 
 ***
@@ -196,9 +202,6 @@ p2 <- ggplot(direct_rates_datasets_enh,
 
 # arrange into one plot
 plot_grid(p1, p2, nrow = 1, scale = 0.95, rel_widths = c(0.62, 1))
-
-# save plot to file 
-ggsave(file = "results/manuscript/plots/crispr_direct_effects_rate.pdf", height = 4, width = 11)
 ```
 
 ```{r, fig.width=11, fig.height=4}
@@ -216,15 +219,61 @@ p2 <- p2 +
 
 # arrange into one plot
 plot_grid(p1, p2, nrow = 1, scale = 0.95, rel_widths = c(0.62, 1))
-
-# save plot to file 
-ggsave(file = "results/manuscript/plots/crispr_direct_effects_rate_log_space.pdf", height = 4, width = 11)
 ```
 
 
 ***
 
 ## Indirect effects as function of distance
+Using the model for direct effects as function of distance to TSS and the estimated indirect effects
+rate the probability of hits being the result of direct hits as function of their distance to TSS
+was calculated.
+
+### Imputing indirect effects rates
+For some CRISPR datasets in both the training and held-out data, no empirical indirect effect rates
+was calculated. To calculate the probability of being direct effects, the average indirect effects
+rate across all datasets for which indirect rates were computed was used.
+
+Datasets for which the indirect effects rate was imputed:
+```{r}
+crispr %>% 
+  filter(imputed_indirect_rate == TRUE) %>% 
+  select(`Dataset type` = dataset_type, Dataset = indirect_effects_dataset, Regulated) %>% 
+  group_by(`Dataset type`, Dataset) %>% 
+  summarize(pairs = n(), positives = sum(Regulated == TRUE), .groups = "drop") %>% 
+  datatable()
+```
+
+### Probability of direct effects
+Plot the probability of E-G pairs being a direct vs. indirect effect as a function of distance to 
+TSS.
+```{r, fig.height=4, fig.width=6.2}
+# add effects direction label for each CRISPR E-G pair
+crispr <- crispr %>% 
+  mutate(effect_direction = if_else(EffectSize <= 0, true = "Negative", false = "Positive"))
+
+# plot direct vs. indirect effect probability as function of distance to TSS
+ggplot(crispr, aes(x = dist_to_tss / 1e3, y = direct_vs_indirect_negative,
+                            color = dataset_plots)) +
+  geom_line() +
+  geom_point(data = filter(crispr, Regulated == TRUE), size = 1.75) +
+  geom_hline(yintercept = c(0.5, 0.9), linetype = "dashed", color = "black", linewidth = 0.25) +
+  labs(title = "Probability of direct CRISPR effects", x = "Distance to TSS (kb)",
+       y = "Probability direct vs. indirect effect", color = "Dataset",
+       shape = "Significant\neffect direction") +
+  scale_shape_manual(values = c(Negative = 19, Positive = 1)) +
+  scale_y_continuous(limits = c(0, 1)) +
+  scale_x_continuous(limits = c(0, 1050)) +
+  theme_classic()
+
+# save plot to pdf
+ggsave(file = "results/manuscript/plots/crispr_direct_vs_indirect_probability.pdf", height = 4,
+       width = 6.2)
+```
+
+***
+
+## Likely direct and indirect effects
 Using the model for direct effects as function of distance to TSS and the estimated indirect effects
 rate calculate at which distance CRISPR hits have >90% and <10% probability to be direct effects.
 ```{r}
@@ -248,7 +297,7 @@ predict_direct_hit_rate <- function(models, new_data, type) {
 # function to find distance to TSS where CRISPR pairs where probability of being direct effects is
 # greater than a given probability.
 calculate_dist_direct_gt_prob <- function(dataset, direct_effect_models, dist_range = c(1, 1e6),
-                                          trans_rates, prob) {
+                                          indirect_rates, prob) {
   
   # create distance to TSS range in 1bp increments
   dist_range <- tibble(
@@ -262,7 +311,7 @@ calculate_dist_direct_gt_prob <- function(dataset, direct_effect_models, dist_ra
                                                      type = "direct_rate_negative"))
   
   # add indirect effects rate for each dataset
-  dist_range <- trans_rates %>% 
+  dist_range <- indirect_rates %>% 
     select(dataset, indirect_hit_rate = positive_rate_negative) %>% 
     left_join(dist_range, ., by = "dataset")
   
@@ -280,16 +329,23 @@ calculate_dist_direct_gt_prob <- function(dataset, direct_effect_models, dist_ra
 ```
 
 ```{r}
-# extract crispr data for dataset with estimated indirect rates
-crispr_datasets <- unique(na.omit(crispr$indirect_effects_dataset))
+# get all CRISPR datasets in training and heldout data
+crispr_datasets <- as.character(unique(crispr$dataset_plots))
 names(crispr_datasets) <- crispr_datasets
-crispr_indirect <- filter(crispr, indirect_effects_dataset %in% crispr_datasets)
+
+# extract empirical or imputed indirect rates for them
+indirect_rates <- crispr %>% 
+  select(dataset = dataset_plots,
+         positive_rate_significant = indirect_rate_all,
+         positive_rate_negative = indirect_rate_negative,
+         positive_rate_positive = indirect_rate_positive) %>% 
+  distinct()
 
 # compute distance at which probability of being a direct effect vs indirect is > 90% for all 
 # datasets
 dist_direct_probs <- lapply(crispr_datasets, FUN = calculate_dist_direct_gt_prob,
-                            direct_effect_models = direct_effect_models, trans_rates = trans_rates,
-                            prob = 0.9)
+                            direct_effect_models = direct_effect_models,
+                            indirect_rates = indirect_rates, prob = 0.9)
 
 # combine into one table
 dist_direct_probs <- bind_rows(dist_direct_probs, .id = "dataset")
@@ -301,41 +357,16 @@ Distance to TSS at which probability of CRISPR E-G pairs being direct vs. indire
 datatable(dist_direct_probs)
 ```
 
-Plot the probability of E-G pairs being a direct vs. indirect effect as a function of distance to 
-TSS.
-```{r, fig.height=4, fig.width=7}
-# add effects direction label for each CRISPR E-G pair
-crispr_indirect <- crispr_indirect %>% 
-  mutate(effect_direction = if_else(EffectSize <= 0, true = "Negative", false = "Positive"))
-
-# plot direct vs. indirect effect probability as function of distance to TSS
-ggplot(crispr_indirect, aes(x = dist_to_tss / 1e3, y = direct_vs_indirect_negative,
-                            color = dataset_plots)) +
-  geom_line() +
-  geom_point(data = filter(crispr_indirect, Regulated == TRUE), size = 1.75) +
-  geom_hline(yintercept = 0.5, linetype = "dashed", color = "black", linewidth = 0.25) +
-  labs(title = "Probability direct vs. indirect effect", x = "Distance to TSS (kb)",
-       y = "Probability direct vs. indirect effect", color = "Dataset",
-       shape = "Significant\neffect direction") +
-  scale_shape_manual(values = c(Negative = 19, Positive = 1)) +
-  scale_y_continuous(limits = c(0, 1)) +
-  theme_classic()
-
-# save plot to pdf
-ggsave(file = "results/manuscript/plots/crispr_direct_vs_indirect_probability.pdf", height = 4,
-       width = 7)
-```
-
-## Enrichment for negative effects among likley direct pairs
+### Enrichment for negative effects among likely direct pairs
 ```{r}
 # annotate results of direct vs indirect effect probability is >0.9
-crispr_indirect <- crispr_indirect %>% 
+crispr <- crispr %>% 
   mutate(p90 = if_else(direct_vs_indirect_negative > 0.9, true = "Prob. direct > 0.9",
                        false = "Prob. direct <= 0.9"))
 
 # count number of significant pairs with positive and negative effects for pairs with direct vs
 # indirect effect probability greater or lower than 0.9
-pairs_p90 <- crispr_indirect %>% 
+pairs_p90 <- crispr %>% 
   group_by(dataset_plots, p90) %>% 
   summarize(significant = sum(Significant == TRUE),
             negative = sum(Significant == TRUE & EffectSize <= 0),
@@ -345,7 +376,7 @@ pairs_p90 <- crispr_indirect %>%
             .groups = "drop")
 ```
 
-```{r, fig.width=10, fig.height=5}
+```{r, fig.width=12, fig.height=5}
 # transform to long format for plotting
 pairs_p90_plot <- pairs_p90 %>% 
   select(dataset_plots, p90, prop_negative, prop_positive) %>% 
@@ -357,7 +388,7 @@ pairs_p90_plot <- pairs_p90 %>%
 ggplot(pairs_p90_plot, aes(x = fct_rev(p90), y = `% significant pairs`, fill = `Effect direction`)) +
   facet_wrap(~ dataset_plots, nrow = 1) +
   geom_bar(stat = "identity") +
-  geom_hline(yintercept = 0.5, size = 0.25) +
+  geom_hline(yintercept = 0.5, linewidth = 0.25) +
   labs(title = "Negative vs. postive effects") +
   scale_fill_manual(values = c(Negative = "steelblue", Positive = "firebrick3")) +
   scale_y_continuous(labels = scales::percent) +
@@ -366,13 +397,13 @@ ggplot(pairs_p90_plot, aes(x = fct_rev(p90), y = `% significant pairs`, fill = `
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-## Effect sizes vs. probability of direct effects
+### Effect sizes vs. probability of direct effects
 ```{r, fig.width=7, fig.height=5}
 # get all significant hits
-crispr_indirect_hits <- filter(crispr_indirect, Significant == TRUE)
+crispr_hits <- filter(crispr, Significant == TRUE)
 
 # plot CRISPR effect size of likely direct vs. likely indirect effects
-ggplot(crispr_indirect_hits, aes(x = dataset_plots, y = EffectSize, color = fct_rev(p90),
+ggplot(crispr_hits, aes(x = dataset_plots, y = EffectSize, color = fct_rev(p90),
                                  group = interaction(dataset_plots, fct_rev(p90)))) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
   geom_point(alpha = 0.5, position = position_jitterdodge(jitter.width = 0.3)) +
@@ -387,12 +418,12 @@ ggplot(crispr_indirect_hits, aes(x = dataset_plots, y = EffectSize, color = fct_
 
 ```{r, fig.width=7, fig.height=5}
 # convert effect size from percent change to log2 fold-change
-crispr_indirect_hits <- crispr_indirect_hits %>% 
+crispr_hits <- crispr_hits %>% 
   mutate(log2_fc_effect_size = log2(1 + EffectSize))
 
 # plot CRISPR effect size of likely direct vs. likely indirect effects
-ggplot(crispr_indirect_hits, aes(x = dataset_plots, y = log2_fc_effect_size, color = fct_rev(p90),
-                                 group = interaction(dataset_plots, fct_rev(p90)))) +
+ggplot(crispr_hits, aes(x = dataset_plots, y = log2_fc_effect_size, color = fct_rev(p90),
+                        group = interaction(dataset_plots, fct_rev(p90)))) +
   geom_hline(yintercept = 0, linetype = "dashed", linewidth = 0.5) +
   geom_point(alpha = 0.5, position = position_jitterdodge(jitter.width = 0.3)) +
   geom_boxplot(color = "black", fill = NA, outlier.shape = NA) +
@@ -404,6 +435,31 @@ ggplot(crispr_indirect_hits, aes(x = dataset_plots, y = log2_fc_effect_size, col
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
+***
+
+## Probability of direct effects of long-range interactions
+Calculate the average probability of direct effects for interactions below and beyond 100kb.
+```{r}
+# probability of direct / indirect effects per dataset
+crispr %>% 
+  mutate(distance_category = if_else(dist_to_tss > 1e5, true = ">100kb", false = "<=100kb")) %>%
+  group_by(dataset_type, Dataset, distance_category) %>% 
+  summarize(avg_prob_direct_effect = mean(direct_vs_indirect_negative), .groups = "drop") %>% 
+  mutate(avg_prob_indirect_effect = 1 - avg_prob_direct_effect) %>% 
+  datatable()
+```
+
+```{r}
+# probability of direct / indirect effects in combined datasets
+crispr %>% 
+  mutate(distance_category = if_else(dist_to_tss > 1e5, true = ">100kb", false = "<=100kb")) %>%
+  group_by(dataset_type, distance_category) %>% 
+  summarize(avg_prob_direct_effect = mean(direct_vs_indirect_negative), .groups = "drop") %>% 
+  mutate(avg_prob_indirect_effect = 1 - avg_prob_direct_effect) %>% 
+  datatable()
+```
+
+***
 
 ## Session information
 This document was produced using following packages:

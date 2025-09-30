@@ -69,16 +69,16 @@ merged_schraivogel <- fread(snakemake@input$merged_schraivogel)
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_nasser <- processMergedData(merged_nasser, pred_config = pred_config,
-                                  filter_valid_connections = TRUE,
-                                  include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                   filter_valid_connections = TRUE,
+                                   include_missing_predictions = TRUE)
 
 merged_gasperini <- processMergedData(merged_gasperini, pred_config = pred_config,
                                       filter_valid_connections = TRUE,
-                                      include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                      include_missing_predictions = TRUE)
 
 merged_schraivogel <- processMergedData(merged_schraivogel, pred_config = pred_config,
                                         filter_valid_connections = TRUE,
-                                        include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                        include_missing_predictions = TRUE)
 ```
 
 ```{r}
@@ -187,7 +187,7 @@ merged_combined <- fread(snakemake@input$merged_main_preds)
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_combined <- processMergedData(merged_combined, pred_config = pred_config,
                                      filter_valid_connections = TRUE,
-                                     include_missing_predictions = TRUE, distToTSS_as_kb = TRUE)
+                                     include_missing_predictions = TRUE)
 
 # compute precision-recall table
 pr_combined <- calcPRCurves(merged_combined, pred_config = pred_config, pos_col = "Regulated")
@@ -270,11 +270,12 @@ thresholds <- deframe(select(perf_combined, pred_uid, alpha_at_min_sensitivity))
 merged_combined_bs <- convertMergedForBootstrap(merged_combined, pred_config = pred_config)
 
 # run bootstraps to get 95% intervals for AUPRC and precision at threshold
-auprc <- bootstrapPerformanceIntervals(merged_combined_bs, metric = "auprc", R = 1000, conf = 0.95,
-                                       ci_type = "perc", ncpus = 2)
+auprc <- bootstrapPerformanceIntervals(merged_combined_bs, metric = "auprc", conf = 0.95,
+                                       R = snakemake@params$bootstrap_iterations, ci_type = "perc",
+                                       ncpus = 2)
 precision <- bootstrapPerformanceIntervals(merged_combined_bs, metric = "precision", 
-                                           thresholds = thresholds, R = 1000,
-                                           conf = 0.95, ci_type = "perc", ncpus = 2)
+                                           thresholds = thresholds, conf = 0.95, ci_type = "perc",
+                                           R = snakemake@params$bootstrap_iterations, ncpus = 2)
 
 # add pretty predictor names
 auprc <- left_join(auprc, select(pred_config, pred_uid, pred_name_long),

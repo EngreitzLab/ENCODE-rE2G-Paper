@@ -43,8 +43,7 @@ pred_config_enhAct <- filter(pred_config_enhAct, pred_id == "EnhActAssayOnly")
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged_enhAct <- processMergedData(merged_enhAct, pred_config = pred_config_enhAct,
                                    filter_valid_connections = TRUE,
-                                   include_missing_predictions = TRUE,
-                                   distToTSS_as_kb = TRUE)
+                                   include_missing_predictions = TRUE)
 
 # compute performance for all enhancer assay predictors
 perf_enhAct <- makePRSummaryTableBS(merged_enhAct, pred_config = pred_config_enhAct,

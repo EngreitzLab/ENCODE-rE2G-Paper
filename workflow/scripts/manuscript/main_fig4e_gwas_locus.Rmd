@@ -136,19 +136,23 @@ e2g_tracks <- mapply(FUN = make_e2g_track, file = e2g_bedpe, name = names(e2g_be
 ```
 
 ```{r makeDNaseTracks}
-# function to download bigwig file as temporary file
-download_bigwig <- function(file, dir = tempdir()) {
+# function to download bigwig file if it doesn't exist
+download_bigwig <- function(file, dir) {
   downloaded_file <- file.path(dir, basename(file))
-  download.file(url = file, destfile = downloaded_file)
+  if (file.exists(downloaded_file) == FALSE) {
+    message("Downloading bigWig file: ", basename(file))
+    dir.create(dirname(downloaded_file), recursive = TRUE, showWarnings = FALSE)
+    download.file(url = file, destfile = downloaded_file)
+  }
 }
 
-# download all DNase-seq bigWig files
-#invisible(lapply(dnase_bigwig, FUN = download_bigwig))
+# download all DNase-seq bigWig files if needed
+invisible(lapply(dnase_bigwig, FUN = download_bigwig, dir = snakemake@params$scratch_dir))
 
 # create DataTracks for DNase-seq signals
-local_files <- file.path("/scratch/users/agschwin/bigwigs", basename(dnase_bigwig))
-names(local_files) <- names(dnase_bigwig)
-dnase_tracks <- lapply(local_files, FUN = DataTrack, genome = "hg38", type = "polygon",
+downloaded_files <- file.path(snakemake@params$scratch_dir, basename(dnase_bigwig))
+names(downloaded_files) <- names(dnase_bigwig)
+dnase_tracks <- lapply(downloaded_files, FUN = DataTrack, genome = "hg38", type = "polygon",
                        name = "DNase-seq", fill.mountain = rep("steelblue", 2),
                        col.mountain = "steelblue")
 ```

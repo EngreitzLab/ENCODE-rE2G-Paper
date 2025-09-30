@@ -1,0 +1,351 @@
+---
+title: "Additional ENCODE-rE2G models analysis"
+author: "Andreas R. Gschwind"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setupDocument, include=FALSE}
+# set output html chunk options
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+
+# set random seed
+set.seed(snakemake@params$seed)
+```
+
+## Goal
+Analyze additional ENCODE-rE2G model performance on CRISPR data to identify properties of E-G pairs 
+that are better predicted when adding additional assays.
+```{r attachPackages}
+# attach required packages
+library(tidyverse)
+library(cowplot)
+library(DT)
+
+# required functions
+proj_dir <- snakemake@config$proj_dir
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+```
+
+***
+
+## Used data
+Load output from CRISPR benchmarking analysis and extract data on CRISPR positive E-G pairs.
+```{r loadData}
+# load merged data
+merged <- read_tsv(snakemake@input$merged_data, show_col_types = FALSE)
+
+# ENCODE-rE2G models to analyze
+models <- c("ENCODE_rE2G.Score", "ENCODE_rE2GdnaseHiC.Score", "ENCODE_rE2GdnaseH3k27ac.Score",
+            "ENCODE_rE2GdnaseH3k27acHiC.Score", "ENCODE_rE2Gext.Score")
+
+# features to include in analysis
+model_features <- c("ENCODE_rE2G.contactFrequency.Feature", "ENCODE_rE2GdnaseHiC.3DContact.Feature",
+                    "ENCODE_rE2GdnaseH3k27acHiC.contactFrequency.Feature",
+                    "3DcontactK562.hic_contact", "3DcontactAvg.hic_contact", "baseline.distToTSS")
+crispr_features <- c("H3K27ac.RPM.expandedRegion", "DHS.RPM")
+
+# load config file containing thresholds for each model
+pred_config <- importPredConfig(snakemake@input$pred_config)
+
+# thresholds for model to analyze
+thresholds <- pred_config %>% 
+  filter(pred_uid %in% models) %>% 
+  select(pred_uid, threshold = alpha)
+```
+
+```{r}
+# extract data on CRISPR E-G pairs for selected models
+crispr <- merged %>% 
+  filter(pred_uid %in% models) %>% 
+  select(name, Regulated, all_of(crispr_features), pred_uid, pred_value)
+
+# add selected model features
+crispr <- merged %>% 
+  filter(pred_uid %in% model_features) %>% 
+  select(name, pred_uid, pred_value) %>% 
+  pivot_wider(names_from = pred_uid, values_from = pred_value) %>% 
+  left_join(crispr, ., by = "name")
+
+# add thresholds and identify predicted pairs
+crispr <- crispr %>% 
+  left_join(thresholds, by = "pred_uid") %>% 
+  mutate(predicted = if_else(pred_value >= threshold, TRUE, FALSE))
+
+# classify each pair whether it's a true positive, false positive, true negative or false negative
+crispr <- crispr %>% 
+  mutate(pred_class = case_when(
+    Regulated == TRUE & predicted == TRUE ~ "TP",
+    Regulated == FALSE & predicted == TRUE ~ "FP",
+    Regulated == FALSE & predicted == FALSE ~ "TN",
+    Regulated == TRUE & predicted == FALSE ~ "FN"
+  ))
+```
+
+```{r}
+# function to calculate expected powerlaw 3D contact
+calculate_powerlaw_contact <- function(distances, gamma, scale, min_distance = 5000) {
+
+    # powerlaw is only calculated for pairs >5kb, so set minimum distance to 5kb
+    distances <- pmax(distances, min_distance)
+    log_dists <- log(distances + 1)
+
+    # compute powerlaw 3D contact
+    powerlaw_contact <- exp(scale + -1 * gamma * log_dists)
+    
+    return(powerlaw_contact)
+    
+}
+
+# calculate expected powerlaw 3D contact based on distance
+crispr <- crispr %>%
+  mutate(powerlaw_contact = calculate_powerlaw_contact(baseline.distToTSS,
+                                                       gamma = 1.024238616787792,
+                                                       scale = 5.9594510043736655))
+```
+
+***
+
+## Adding Intact Hi-C to ENCODE-rE2G
+```{r, fig.width=6, fig.height=4}
+# get data on unique CRISPR pairs, including selected model results and features
+crispr_hic <- crispr %>% 
+  filter(pred_uid %in% c("ENCODE_rE2G.Score", "ENCODE_rE2GdnaseHiC.Score")) %>% 
+  select(name, Regulated, powerlaw_contact,
+         avgHiC = `3DcontactAvg.hic_contact`,
+         K562HiC = `3DcontactK562.hic_contact`,
+         distToTSS = `baseline.distToTSS`,
+         pred_uid, pred_class) %>% 
+  pivot_wider(names_from = pred_uid, values_from = pred_class)
+
+# label cases where adding Hi-C data converts FP to TP
+crispr_hic <- crispr_hic %>% 
+  mutate(correct = if_else((`ENCODE_rE2G.Score` == "FN" & `ENCODE_rE2GdnaseHiC.Score` == "TP"),
+                           "FN to TP", "other"))
+
+# only retain CRISPR positive pairs
+crispr_hic_pos <- filter(crispr_hic, Regulated == TRUE)
+
+# make plot
+p_add_hic <- ggplot(crispr_hic_pos, aes(x = distToTSS / 1e6, y = K562HiC, color = correct)) +
+  geom_point(data = filter(crispr_hic_pos, correct == "other")) +
+  geom_line(aes(x = distToTSS / 1e6, y = powerlaw_contact), color = "black") +
+  geom_point(data = filter(crispr_hic_pos, correct == "FN to TP")) +
+  labs(title = "Adding K562 Hi-C", x = "Distance to TSS (Mb)", y = "K562 ENCODE Hi-C",
+       color = "E-G pair outcome") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme_classic()
+
+p_add_hic
+```
+
+
+```{r}
+# calculate fold change over powerlaw and megamap Hi-C
+fc_k562_hic <- crispr_hic_pos %>% 
+  filter(correct == "FN to TP") %>% 
+  mutate(fc_over_powerlaw = K562HiC / powerlaw_contact,
+         fc_over_megamap = K562HiC / avgHiC)
+
+range(fc_k562_hic$fc_over_powerlaw)
+range(fc_k562_hic$fc_over_megamap)
+```
+
+***
+
+## Adding H3K27ac to ENCODE-rE2G
+
+```{r, fig.width=6, fig.height=4}
+# get data on unique CRISPR pairs, including selected model results and features
+crispr_h3k27ac <- crispr %>% 
+  filter(pred_uid %in% c("ENCODE_rE2G.Score", "ENCODE_rE2GdnaseH3k27ac.Score")) %>% 
+  select(name, Regulated,
+         H3K27ac = `H3K27ac.RPM.expandedRegion`,
+         DHS = `DHS.RPM`,
+         distToTSS = `baseline.distToTSS`, pred_uid, pred_class) %>% 
+  pivot_wider(names_from = pred_uid, values_from = pred_class)
+
+# label cases where adding Hi-C data converts FP to TP
+crispr_h3k27ac <- crispr_h3k27ac %>% 
+  mutate(correct = if_else((`ENCODE_rE2G.Score` == "FN" & `ENCODE_rE2GdnaseH3k27ac.Score` == "TP"),
+                           "FN to TP", "other"))
+
+# only retain data on positives
+crispr_h3k27ac_pos <- filter(crispr_h3k27ac, Regulated == TRUE)
+
+# plot H3K27ac signal
+h3k27ac_plot <- ggplot(crispr_h3k27ac_pos,
+                    aes(x = correct, y = H3K27ac, color = correct)) +
+  geom_point(position = position_jitterdodge()) +
+  geom_boxplot(fill = NA, outlier.shape = NA, color = "black", width = 0.5) +
+    labs(title = "H3K27ac (CRISPR pos.)", x = "E-G pair outcome",
+         y = "H3K27ac RPM\n(expanded region)") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+# plot DHS signal
+dhs_plot <- ggplot(crispr_h3k27ac_pos,
+                    aes(x = correct, y = DHS, color = correct)) +
+  geom_point(position = position_jitterdodge()) +
+  geom_boxplot(fill = NA, outlier.shape = NA, color = "black", width = 0.5) +
+    labs(title = "DHS (CRISPR pos.)", x = "E-G pair outcome",
+         y = "DHS RPM") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+# arrange plots in one figure
+plot_grid(h3k27ac_plot, dhs_plot, nrow = 1)
+```
+
+```{r, fig.width=6, fig.height=4.5}
+# plot DHS vs H3K27ac signals for all CRISPR positives
+ggplot(crispr_h3k27ac_pos, aes(x = DHS, y = H3K27ac, color = correct)) +
+  geom_point(data = filter(crispr_h3k27ac_pos, correct == "other")) +
+  geom_point(data = filter(crispr_h3k27ac_pos, correct == "FN to TP")) +
+  geom_abline() +
+  labs(title = "H3K27ac vs DHS (CRISPR pos.)", color = "E-G pair outcome") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  scale_y_log10() +
+  scale_x_log10() +
+  theme_classic()
+```
+
+```{r, fig.width=4, fig.height=4}
+# calculate H3K27ac to DHS ratio
+crispr_h3k27ac_pos <- crispr_h3k27ac_pos %>% 
+  mutate(h3k27ac_dhs_ratio = (H3K27ac + 0.001) / (DHS + 0.001))
+
+# plot H3K27ac vs DHS ratio
+p_add_h3k27ac <- ggplot(crispr_h3k27ac_pos,
+                        aes(x = fct_rev(correct), y = h3k27ac_dhs_ratio, color = correct)) +
+  geom_point(position = position_jitterdodge()) +
+  geom_boxplot(fill = NA, outlier.shape = NA, color = "black", width = 0.5) +
+    labs(title = "Adding K562 H3K27ac", x = "E-G pair outcome", y = "H3K37ac / DHS\nRPM ratio") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  theme_classic() +
+  theme(legend.position = "none")
+
+p_add_h3k27ac
+```
+
+```{r}
+# calculate t-test on contact frequency type for other pairs
+ratio_correct <- pull(filter(crispr_h3k27ac_pos, correct == "FN to TP"), h3k27ac_dhs_ratio)
+ratio_other <- pull(filter(crispr_h3k27ac_pos, correct == "other"), h3k27ac_dhs_ratio)
+other_test <- wilcox.test(ratio_correct, ratio_other)
+other_test$p.value
+```
+
+## Adding both Hi-C and H3K27ac
+```{r}
+# get data on unique CRISPR pairs, including selected model results and features
+crispr_h3k27ac_hic <- crispr %>% 
+  filter(pred_uid %in% c("ENCODE_rE2G.Score", "ENCODE_rE2GdnaseH3k27acHiC.Score")) %>% 
+  select(name, Regulated, powerlaw_contact,
+         H3K27ac = `H3K27ac.RPM.expandedRegion`,
+         DHS = `DHS.RPM`, 
+         avgHiC = `3DcontactAvg.hic_contact`,
+         K562HiC = `3DcontactK562.hic_contact`,
+         distToTSS = `baseline.distToTSS`, pred_uid, pred_class) %>% 
+  pivot_wider(names_from = pred_uid, values_from = pred_class)
+
+# label cases where adding Hi-C data converts FP to TP
+crispr_h3k27ac_hic <- crispr_h3k27ac_hic %>% 
+  mutate(correct = if_else((`ENCODE_rE2G.Score` == "FN" & `ENCODE_rE2GdnaseH3k27acHiC.Score` == "TP"),
+                           "FN to TP", "other"))
+
+# only retain data on positives
+crispr_h3k27ac_hic_pos <- filter(crispr_h3k27ac_hic, Regulated == TRUE)
+```
+
+```{r, fig.height=4, fig.width=6}
+# compute observed over expected 3D contact
+crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>% 
+  mutate(avgHiC_over_expected = avgHiC / powerlaw_contact,
+         K562HiC_over_expected = K562HiC / powerlaw_contact)
+
+# calculate H3K27ac / DHS ratio
+crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>% 
+  mutate(h3k27ac_dhs_ratio = (H3K27ac + 0.001) / (DHS + 0.001))
+
+# compute Z-scores for H3K27ac and K562 Hi-C signal 
+# crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>% 
+#   mutate(h3k27ac_zscore = scale(H3K27ac), K562HiC_zscore = scale(K562HiC))
+
+# calculate average ratios
+avg_h3k27ac_dhs_ratio <- median(crispr_h3k27ac_hic_pos$h3k27ac_dhs_ratio)
+avg_k562_avg_hic_ratio <- median(crispr_h3k27ac_hic_pos$K562HiC_over_expected)
+
+# plot ratios
+p_add_hic_h3k27ac <- ggplot(crispr_h3k27ac_hic_pos,
+                            aes(x = h3k27ac_dhs_ratio, y = K562HiC_over_expected, color = correct)) +
+  geom_point(data = filter(crispr_h3k27ac_hic_pos, correct == "other")) +
+  geom_point(data = filter(crispr_h3k27ac_hic_pos, correct == "FN to TP")) +
+  geom_hline(yintercept = avg_k562_avg_hic_ratio) +
+  geom_vline(xintercept = avg_h3k27ac_dhs_ratio) +
+  labs(title = "Adding K562 Hi-C and H3K27ac", x = "H3K27ac / DHS\nRPM ratio",
+       y = "K562 contact\n(observed / expected)", color = "E-G pair outcome") +
+  scale_colour_manual(values = c("FN to TP" = "red", "other" = "gray")) +
+  scale_x_sqrt() +
+  scale_y_sqrt() +
+  theme_classic()
+
+p_add_hic_h3k27ac
+```
+
+```{r}
+# count pairs in each quadrant
+pairs_per_quadrant <- crispr_h3k27ac_hic_pos %>% 
+  mutate(lowHiC = K562HiC_over_expected <= avg_k562_avg_hic_ratio,
+         lowH3K27ac = h3k27ac_dhs_ratio <= avg_h3k27ac_dhs_ratio) %>% 
+  group_by(correct) %>% 
+  summarize(lowHiC_lowH3K27ac = sum(lowHiC == TRUE & lowH3K27ac == TRUE),
+            lowHiC_highH3K27ac = sum(lowHiC == TRUE & lowH3K27ac == FALSE),
+            highHiC_lowH3K27ac = sum(lowHiC == FALSE & lowH3K27ac == TRUE),
+            highHiC_highH3K27ac = sum(lowHiC == FALSE & lowH3K27ac == FALSE))
+
+# calculate percentage of pairs in each quadrant
+perc_pairs <- pairs_per_quadrant %>% 
+  pivot_longer(cols = -correct, values_to = "pairs", names_to = "quadrant") %>% 
+  group_by(correct) %>% 
+  mutate(total_pairs = sum(pairs),
+         perc_pairs = pairs / total_pairs * 100)
+```
+
+```{r}
+datatable(perc_pairs)
+```
+
+***
+
+## Compile figure
+```{r, fig.height=4, fig.width=14}
+# arrange plot for figure
+plot_grid(p_add_hic + theme(legend.position = "left"),
+          p_add_h3k27ac,
+          p_add_hic_h3k27ac + theme(legend.position = "none"),
+          nrow = 1, rel_widths = c(1.2, 0.8, 0.8), scale = 0.9, labels = c("b", "c", "d"),
+          align = "h")
+
+# save plot to file
+ggsave(file = "results/manuscript/plots/extended_fig3bcd_additional_models.pdf", height = 4,
+       width = 14)
+```
+
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

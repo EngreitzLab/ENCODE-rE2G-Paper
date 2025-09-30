@@ -2,17 +2,25 @@
 
 configfile: "config/config.yml"
 
+# ENCODE-rE2G prediction and enhancer list files
+configfile: "config/encode_re2g_predictions.yml"
+configfile: "config/encode_re2g_enhancer_lists.yml"
+
 include: "rules/manuscript.smk"
 include: "rules/WIP.smk"
 
 rule all:
   input:
-    "results/manuscript/main_fig2_crispr_benchmarking.html",
-    "results/manuscript/main_fig2_heldout_crispr_benchmarking.html",
+    "results/manuscript/main_fig1b_prkar2b_locus.html",
+    "results/manuscript/main_crispr_benchmarks.html",
+    "results/manuscript/additional_crispr_benchmarks.html",
+#    "results/manuscript/indirect_effects.html",
+    "results/manuscript/heldout_crispr_benchmarks.html",
+    "results/manuscript/main_fig4e_gwas_locus.html",
     "results/manuscript/main_fig5_additional_models.html",
+    "results/manuscript/extended_data_fig3_additional_models.html",
     "results/manuscript/assaying_enhancer_activity_figures.html",
-    "results/manuscript/crispr_indirect_effects.html",
-    "results/manuscript/crispr_supplementary_note_S1.1.html",
+#    "results/manuscript/crispr_supplementary_note_S1.1.html",
     "results/manuscript/extended_data_fig1_feature_correlation.html",
     "results/manuscript/extended_data_fig2_crispr_benchmarking.html",
     "results/manuscript/figS8_additional_crispr_benchmarks.html",
@@ -22,11 +30,14 @@ rule all:
     "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot.pdf",
     "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot_zoomed.pdf",
     "results/manuscript/plots/supp_crispr_locus_plots/gata1_locus_plot.pdf",
+    "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions.csv",
+    "results/manuscript/tables/table_s2_metadata_encode_re2g_ext_predictions.csv",
+    "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions_combined.csv",
     "results/manuscript/tables/table_S11_baseline_predictors.csv",
     "results/manuscript/tables/table_s12_performance_summary.csv",
     "results/manuscript/tables/table_s17_enhancer_activity_files.csv",
-    "results/manuscript/tables/table_s19_indirect_effects.csv",
-    "results/manuscript/tables/table_s19_indirect_effects_1mb.csv"
+    "results/manuscript/tables/table_s18_encode_re2g_stats_per_experiment.csv",
+    "results/manuscript/tables/table_s19_encode_re2g_stats_per_gene.csv",
 
 rule download_genome_annotation:
   output: "resources/gencode.v29.annotation.gtf.gz"
@@ -60,6 +71,8 @@ rule download_encode_bam:
   params:
     url = "https://www.encodeproject.org/files/{accession}/@@download/{accession}.bam"
   conda: "envs/analyses_env.yml"
+  resources:
+    mem = "32G"
   shell:
     "wget -O {output.bam} {params.url}; "
     "samtools sort -o {output.sorted_bam} {output.bam}; "

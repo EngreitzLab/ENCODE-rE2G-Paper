@@ -57,9 +57,8 @@ pred_config <- pred_config %>%
   filter(pred_id != "EnhActAssayDHS")
 
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
-merged <- processMergedData(merged, pred_config = pred_config,
-                            filter_valid_connections = TRUE, include_missing_predictions = TRUE,
-                            distToTSS_as_kb = TRUE)
+merged <- processMergedData(merged, pred_config = pred_config, filter_valid_connections = TRUE,
+                            include_missing_predictions = TRUE)
 ```
 
 ## Calculate performance
@@ -119,7 +118,7 @@ merged_top_assays <- filter(merged, pred_uid %in% perf_top_assays$pred_uid)
 # compute bootstrapped performance for top10 models
 merged_top_assays_bs <- convertMergedForBootstrap(merged_top_assays, pred_config = pred_config)
 bs_perf_top_assays <- bootstrapPerformanceIntervals(merged_top_assays_bs, metric = "auprc",
-                                                      R = 1000)
+                                                      R = snakemake@params$bootstrap_iterations)
 
 # add long predictor names and rank 
 bs_perf_top_assays <- perf_enh_act_bigwig_assays %>% 
@@ -149,14 +148,6 @@ p1 <- ggplot(perf_enh_act_bigwig_assays, aes(x = rank, y = AUPRC)) +
   scale_y_continuous(limits = c(0, 1)) +
   theme_classic() +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
-
-# manually rename some top assay models
-# bs_perf_top_assays <- bs_perf_top_assays %>%
-#   mutate(pred_name_long = case_when(
-#     pred_name_long == "NCOR1 (ENCFF935VYF)" ~ "NCOR1 (1)",
-#     pred_name_long == "NCOR1 (ENCFF241YVJ)" ~ "NCOR1 (2)",
-#     TRUE ~ as.character(pred_name_long)
-#   ))
 
 # create pretty names for top models including assay name and performance rank
 bs_perf_top_assays <- bs_perf_top_assays %>%
@@ -201,7 +192,8 @@ merged_hist <- filter(merged, pred_uid %in% perf_hist$pred_uid)
 
 # compute bootstrapped performance for histone modification models
 bs_perf_hist_bs <- convertMergedForBootstrap(merged_hist, pred_config = pred_config)
-bs_perf_hist <- bootstrapPerformanceIntervals(bs_perf_hist_bs, metric = "auprc", R = 1000)
+bs_perf_hist <- bootstrapPerformanceIntervals(bs_perf_hist_bs, metric = "auprc",
+                                              R = snakemake@params$bootstrap_iterations)
 
 # add pretty predictor names
 bs_perf_hist <- perf_enh_act_bigwig %>% 
