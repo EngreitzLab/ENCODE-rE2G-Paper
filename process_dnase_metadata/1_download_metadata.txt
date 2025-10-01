@@ -1,0 +1,7 @@
+## Query URLs that were used to download metadata on DNase-seq experiments from the ENCODE portal
+
+# DNase-seq bam files (dnase_metadata_bam_230927.tsv)
+https://www.encodeproject.org/metadata/?type=Experiment&status=released&assay_title=DNase-seq&assembly=GRCh38&files.file_type=bam&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens
+
+# DNase-seq fastq files (dnase_metadata_fastq_230927.tsv)
+https://www.encodeproject.org/metadata/?type=Experiment&status=released&assay_title=DNase-seq&assembly=GRCh38&replicates.library.biosample.donor.organism.scientific_name=Homo+sapiens&files.file_type=fastq

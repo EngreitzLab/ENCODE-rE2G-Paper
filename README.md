@@ -7,3 +7,7 @@ companion paper. Analyses can be found in following subdirectories:
 Snakemake workflow for CRISPR benchmarking and other related analyses results shown in Main
 Figures 1, 2, 4 and 5, Extended Data Figures 1, 2, 3, 7, Supplementary Figures S1.1, S1.2, S7, S8,
 S9, S10, as well as Supplementary Tables S2, S9, S10, S14, S15, S16.
+
+### process_dnase_metadata:
+Code to process DNase-seq metadata from the ENCODE portal to select input files to generate
+ENCODE-rE2G predictions for 1,458 human DNase-seq experiments.
