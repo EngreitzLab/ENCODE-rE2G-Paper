@@ -1,0 +1,3 @@
+[submodule "crispr_analyses/CRISPR_comparison"]
+	path = crispr_analyses/CRISPR_comparison
+	url = https://github.com/EngreitzLab/CRISPR_comparison.git
