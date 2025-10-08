@@ -1,0 +1,6 @@
+feature	Extended	DNase + H3K27ac + ENCODE Hi-C	DNase + H3K27ac	DNase + ENCODE Hi-C	DNase-only	ATAC + H3K27ac + ENCODE Hi-C	ATAC + H3K27ac	ATAC + ENCODE Hi-C	ATAC-only
+DNase-seq	1	1	1	1	1	0	0	0	0
+ATAC-seq	0	0	0	0	0	1	1	1	1
+H3K27ac	1	1	1	0	0	1	1	0	0
+ENCODE Hi-C	1	1	0	1	0	1	0	1	0
+Extended features	1	0	0	0	0	0	0	0	0

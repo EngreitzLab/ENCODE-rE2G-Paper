@@ -1,8 +1,5 @@
 ## Create table of performance summary for (almost) all predictors
 
-save.image("table.rda")
-stop()
-
 suppressPackageStartupMessages({
   
   # attach required packages
@@ -62,8 +59,6 @@ if (snakemake@params$compute_enhAct_performance == TRUE) {
     mutate(cell_type = "K562", .before = 1) %>% 
     relocate(pred_name_long, .after = "pred_uid")
   
-  # replace precision at threshold columns with precision at 70% recall (inferred threshold)
-  
   # add to performance summary list
   perf <- c(perf, list(EnhancerAssays = perf_enhAct))
   
@@ -71,6 +66,23 @@ if (snakemake@params$compute_enhAct_performance == TRUE) {
 
 
 # Create table with performance for all distal regulation predictors -------------------------------
+
+# function to set performance at threshold columns to precision at minimum sensitivity if no threshold
+# was provided
+set_prec_threshold <- function(perf) {
+  if (!"Threshold" %in% colnames(perf)) {
+    perf <- perf %>% 
+      mutate(Threshold = round(ThresholdMinSens, digits = 4), PrecThresh = PrecMinSens,
+             PrecThresh_lowerCi = PrecMinSens_lowerCi,
+             PrecThresh_upperCi = PrecMinSens_upperCi,
+             RecallThresh = RecallMinSens, RecallThresh_lowerCi = RecallMinSens_lowerCi,
+             RecallThresh_upperCi = RecallMinSens_upperCi)
+  }
+  return(perf)
+}
+
+# create perform at threshold columns for each benchmark if needed
+perf <- lapply(perf, set_prec_threshold)
 
 # combine performance summaries into one table
 perf <- bind_rows(perf, .id = "sample")
@@ -92,13 +104,13 @@ perf <- perf %>%
 
 # reformat for supplementary table
 output <- perf %>% 
-  select(predictor = pred_name_long, category, AUPRC, `AUPRC lower CI` = AUPRC_lowerCi,
+  select(Predictor = pred_name_long, Category = category, AUPRC, `AUPRC lower CI` = AUPRC_lowerCi,
          `AUPRC upper CI` = AUPRC_upperCi, Threshold, `Precision at threshold` = PrecThresh,
          `Precision at threshold lower CI` = PrecThresh_lowerCi, 
          `Precision at threshold upper CI` = PrecThresh_upperCi) %>% 
   mutate(Threshold = abs(Threshold)) %>%  # convert to absolute value for inverse predictors
   distinct() %>% 
-  arrange(category, desc(AUPRC))
+  arrange(Category, desc(AUPRC))
   
 # write to output file
 write_csv(output, file = snakemake@output[[1]])

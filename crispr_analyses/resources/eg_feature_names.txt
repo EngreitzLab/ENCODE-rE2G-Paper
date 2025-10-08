@@ -1,0 +1,75 @@
+column_name	feature_set	feature_name
+EpiMapScore	epimap	EpiMap Score
+pearsonCorrelation	correlation	DNase-DNase E-P correlation (Pearson)
+spearmanCorrelation	correlation	DNase-DNase E-P correlation (Spearman)
+glsCoefficient	correlation	DNase-DNase E-P correlation (GLS)
+STARRseqABC	starrseq_abc	"ABC_A=STARR-seq, C=Average Hi-C"
+STARRseqScore	starrseq_abc	STARR-seq Enhancer Activity
+numTSSEnhGene	NumTSSEnhGene	# TSSs between E and P
+numCandidateEnhGene	NumCandidateEnhGene	# DNase peaks between E and P
+normalizedDNase_enh	EnhancerPredictionsAllPutative	DNase signal at E
+normalizedDNase_prom	EnhancerPredictionsAllPutative	DNase signal at P
+normalizedH3K27ac_prom	EnhancerPredictionsAllPutative	H3K27ac signal at P
+normalizedH3K27ac_enh	EnhancerPredictionsAllPutative	H3K27ac signal at E
+activity_enh	EnhancerPredictionsAllPutative	ABC: Activity at E
+3DContact	EnhancerPredictionsAllPutative	Contact frequency (ENCODE Hi-C)
+activity_enh_squared	EnhancerPredictionsAllPutative	ABC: (Activity at E)^2
+3DContact_squared	EnhancerPredictionsAllPutative	Contact frequency (ENCODE Hi-C)^2
+activity_prom	EnhancerPredictionsAllPutative	ABC: Activity at P
+distanceToTSS	EnhancerPredictionsAllPutative	Distance to TSS
+ABCNumerator	EnhancerPredictionsAllPutative	ABC: Numerator
+ABCScore	EnhancerPredictionsAllPutative	"ABC_A=DNase x H3K27ac, C=ENCODE Hi-C"
+ABCDenominator	EGFeatureList	ABC: Denominator
+numNearbyEnhancers	EGFeatureList	# DNase peaks within 5Kb of E
+numNearbyEnhancers_10kb	EGFeatureList	# DNase peaks within 10 Kb of E
+sumNearbyEnhancers	EGFeatureList	Activity of other peaks within 5kb of E
+sumNearbyEnhancers_10kb	EGFeatureList	Activity of other peaks within 10kb of E
+PEToutsideNormalized	CTCF_CIA	CTCF PET counts spanning E-P pair
+PETcrossNormalized	CTCF_CIA	CTCF PET counts crossing E-P pair
+promCTCF	CTCF_CIA	CTCF signal at P
+enhCTCF	CTCF_CIA	CTCF signal at E
+GraphReg.Score	GraphReg	GraphReg LR Score
+H3K4me3_e_max_L_8	GraphReg	"GraphReg: H3K4me3 at E, signal max"
+H3K27ac_e_max_L_8	GraphReg	"GraphReg: H3K27ac at E, signal max"
+DNase_e_max_L_8	GraphReg	"GraphReg: DNase at E, signal max"
+H3K4me3_e_grad_max_L_8	GraphReg	"GraphReg: H3K4me3 at E, gradient max"
+H3K27ac_e_grad_max_L_8	GraphReg	"GraphReg: H3K27ac at E, gradient max"
+DNase_e_grad_max_L_8	GraphReg	"GraphReg: DNase at E, gradient max"
+H3K4me3_e_grad_min_L_8	GraphReg	"GraphReg: H3K4me3 at E, gradient min"
+H3K27ac_e_grad_min_L_8	GraphReg	"GraphReg: H3K27ac at E, gradient min"
+DNase_e_grad_min_L_8	GraphReg	"GraphReg: DNase at E, gradient min"
+H3K4me3_p_max_L_8	GraphReg	"GraphReg: H3K4me3 at P, signal max"
+H3K27ac_p_max_L_8	GraphReg	"GraphReg: H3K27ac at P, signal max"
+DNase_p_max_L_8	GraphReg	"GraphReg: DNase at P, signal max"
+H3K4me3_p_grad_max_L_8	GraphReg	"GraphReg: H3K4me3 at P, gradient max"
+H3K27ac_p_grad_max_L_8	GraphReg	"GraphReg: H3K27ac at P, gradient max"
+DNase_p_grad_max_L_8	GraphReg	"GraphReg: DNase at P, gradient max"
+H3K4me3_p_grad_min_L_8	GraphReg	"GraphReg: H3K4me3 at P, gradient min"
+H3K27ac_p_grad_min_L_8	GraphReg	"GraphReg: H3K27ac at P, gradient min"
+DNase_p_grad_min_L_8	GraphReg	"GraphReg: DNase at P, gradient min"
+averageCorrWeighted	enhancer_weighted_corr	Correlation of ABC scores for gene across cell type
+RamilWeighted	RamilCorrelation	H3K27ac E-P weighted correlation
+phastConMax	phastCon30	PhastCons at E
+phyloPMax	phyloP100	phyloP at E
+P2PromoterClass	geneClasses	Promoter class (Bergman et al. 2022)
+ubiquitousExpressedGene	geneClasses	Ubiquitously expressed gene
+ABCScoreDNaseOnlyAvgHicTrack1	ABCdnaseOnlyTrack1	NA
+activityEnhDNaseOnlyAvgHicTrack2_squared	ABCdnaseOnlyTrack2	ABC: (DNase signal at E)^2
+activityPromDNaseOnlyAvgHicTrack2	ABCdnaseOnlyTrack2	ABC: (DNase signal at P)^2
+ABCScoreDNaseOnlyAvgHicTrack2	ABCdnaseOnlyTrack2	"ABC_A=DNase, C=Average Hi-C"
+ABCScoreAvgHicTrack1	ABCavgHicTrack1	NA
+ABCScoreAvgHicTrack2	ABCavgHicTrack2	NA
+3DContactAvgHicTrack1	ABCavgHicTrack1	NA
+3DContactAvgHicTrack2	ABCavgHicTrack2	Contact frequency (average Hi-C)
+3DContactAvgHicTrack1_squared	ABCavgHicTrack1	NA
+3DContactAvgHicTrack2_squared	ABCavgHicTrack2	Contact frequency (average Hi-C)^2
+powerlawContactHicTrack2	ABCavgHicTrack2	NA
+HiCLoopOutsideNormalized	HiC	Hi-C loops spanning E-P pair
+HiCLoopCrossNormalized	HiC	Hi-C loops crossing E-P pair
+inTAD	HiC	In TAD
+inCCD	HiC	In CCD
+normalizedEP300_enh	enhActivity	EP300 signal at E
+3DContactInSituHiC	inSituABC	Contact frequency (In-situ Hi-C)
+RNApearsonCorrelation	RNAcorrelation	DNase-RNA E-P correlation (Pearson)
+RNAspearmanCorrelation	RNAcorrelation	DNase-RNA E-P correlation (Spearman)
+RNAglsCoefficient	RNAcorrelation	DNase-RNA E-P correlation (GLS)

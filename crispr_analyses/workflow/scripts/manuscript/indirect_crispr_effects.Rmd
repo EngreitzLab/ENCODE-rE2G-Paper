@@ -11,7 +11,7 @@ output:
 
 ```{r setupDocument, include=FALSE}
 # set output html chunk options
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 # suppress dplyrs summarize info
 options(dplyr.summarize.inform = FALSE)
@@ -67,6 +67,10 @@ crispr_heldout <- merged_heldout %>%
 # load file used to convert dataset ids in CRISPR data files to ids in indirect effects analyses
 datasets <- read_tsv(snakemake@input$dataset_ids, show_col_types = FALSE)
 datasets <- rename(datasets, indirect_effects_dataset = dataset, Dataset = dataset_crispr_files)
+
+# filter out datasets from alternative analyses
+rm_datasets <- c("K562_DC_TAPseq_FDR20", "WTC11_DC_TAPseq_FDR20")
+datasets <- filter(datasets, !indirect_effects_dataset %in% rm_datasets)
 
 # combine all CRISPR data into one table and add dataset ids for indirect effects analyses
 crispr <- bind_rows(training = crispr_training, heldout = crispr_heldout, .id = "dataset_type") %>% 
@@ -312,7 +316,7 @@ calculate_dist_direct_gt_prob <- function(dataset, direct_effect_models, dist_ra
   
   # add indirect effects rate for each dataset
   dist_range <- indirect_rates %>% 
-    select(dataset, indirect_hit_rate = positive_rate_negative) %>% 
+    select(dataset, indirect_hit_rate = indirect_rate_negative) %>% 
     left_join(dist_range, ., by = "dataset")
   
   # calculate probability direct vs. indirect hit
@@ -335,10 +339,7 @@ names(crispr_datasets) <- crispr_datasets
 
 # extract empirical or imputed indirect rates for them
 indirect_rates <- crispr %>% 
-  select(dataset = dataset_plots,
-         positive_rate_significant = indirect_rate_all,
-         positive_rate_negative = indirect_rate_negative,
-         positive_rate_positive = indirect_rate_positive) %>% 
+  select(dataset = dataset_plots, indirect_rate_negative) %>% 
   distinct()
 
 # compute distance at which probability of being a direct effect vs indirect is > 90% for all 

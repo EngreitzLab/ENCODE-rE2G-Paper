@@ -6,23 +6,25 @@ configfile: "config/config.yml"
 configfile: "config/encode_re2g_predictions.yml"
 configfile: "config/encode_re2g_enhancer_lists.yml"
 
+# include rules for all analyses
 include: "rules/manuscript.smk"
-include: "rules/WIP.smk"
+include: "rules/enhancer_definitions.smk"
 
 rule all:
   input:
     "results/manuscript/main_fig1b_prkar2b_locus.html",
     "results/manuscript/main_crispr_benchmarks.html",
     "results/manuscript/additional_crispr_benchmarks.html",
-#    "results/manuscript/indirect_effects.html",
+    "results/manuscript/indirect_effects.html",
     "results/manuscript/heldout_crispr_benchmarks.html",
     "results/manuscript/main_fig4e_gwas_locus.html",
     "results/manuscript/main_fig5_additional_models.html",
     "results/manuscript/extended_data_fig3_additional_models.html",
     "results/manuscript/assaying_enhancer_activity_figures.html",
-#    "results/manuscript/crispr_supplementary_note_S1.1.html",
+    "results/manuscript/crispr_supplementary_note_S1.1.html",
     "results/manuscript/extended_data_fig1_feature_correlation.html",
     "results/manuscript/extended_data_fig2_crispr_benchmarking.html",
+    "results/manuscript/plots/extended_data_fig6i_activity_vs_distance.pdf",    
     "results/manuscript/figS8_additional_crispr_benchmarks.html",
     "results/manuscript/figS9_predictors_vs_crispr_effects.html",
     "results/manuscript/plots/main_fig5a_prkar2b_features.pdf",
@@ -30,6 +32,7 @@ rule all:
     "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot.pdf",
     "results/manuscript/plots/supp_crispr_locus_plots/myc_locus_plot_zoomed.pdf",
     "results/manuscript/plots/supp_crispr_locus_plots/gata1_locus_plot.pdf",
+    "results/manuscript/plots/figS11_encode_re2g_vs_gene_expression.pdf",
     "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions.csv",
     "results/manuscript/tables/table_s2_metadata_encode_re2g_ext_predictions.csv",
     "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions_combined.csv",

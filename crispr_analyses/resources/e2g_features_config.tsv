@@ -1,0 +1,10 @@
+feat_col	feat_name	color	feature_type	plot_type
+Score	ENCODE-E2G (Full model)	#DC6464	score	histogram
+ABC.Score.Feature	"ABC_A=DNase,C=Average Hi-C"	#7DAEE3	enh_feature	histogram
+3DContact.Feature	Contact frequency (average Hi-C)	#911EB4	enh_feature	histogram
+sumNearbyEnhancers.Feature	Activity of other peaks within 5kb of E	#E6194B	enh_feature	histogram
+distanceToTSS.Feature	Distance to TSS	#9A6324	enh_feature	l
+numTSSEnhGene.Feature	# TSSs between E and P	#000000	enh_feature	l
+numCandidateEnhGene.Feature	# elements between E and P	#000000	enh_feature	l
+normalizedDNase_prom.Feature	DNase signal at P	#3CB44B	prom_feature	histogram
+ubiquitousExpressedGene.Feature	Ubiquitously expressed gene	#A9A9A9	prom_feature	p

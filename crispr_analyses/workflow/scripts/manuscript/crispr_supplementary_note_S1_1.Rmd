@@ -6,9 +6,6 @@ output: html_document
 ---
 
 ```{r setupDocument, include=FALSE}
-save.image("crispr_supp_fig.rda")
-stop()
-
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
@@ -18,7 +15,6 @@ library(tidyverse)
 library(data.table)
 library(ggExtra)
 library(cowplot)
-library(here)
 ```
 
 ## Goal
@@ -29,13 +25,9 @@ Create plots for CRISPR data supplementary note.
 ## Panel B,C: Power analysis results
 
 ```{r}
-# files containg CRISPR benchmarking data for Gasperini et al., 2019 and Schraivogel et al., 2020
-gasp_crispr_file <- here("../ENCODE_CRISPR_data/results/ENCODE/EPCrisprBenchmark/EPCrisprBenchmark_Gasperini2019_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz")
-schrai_crispr_file <- here("../ENCODE_CRISPR_data/results/ENCODE/EPCrisprBenchmark/EPCrisprBenchmark_TAPseq_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz")
-
 # load CRISPR data
-gasp_crispr <- read_tsv(gasp_crispr_file, show_col_types = FALSE)
-schrai_crispr <- read_tsv(schrai_crispr_file, show_col_types = FALSE)
+gasp_crispr <- read_tsv(snakemake@input$gasp_crispr, show_col_types = FALSE)
+schrai_crispr <- read_tsv(snakemake@input$schrai_crispr, show_col_types = FALSE)
 ```
 
 ```{r, fig.height=4, fig.width=7.5}
@@ -125,39 +117,47 @@ power_schrai_plot <- plot_grid(p2, p1, ncol = 2, rel_widths = c(0.33, 0.66))
 ## Panel D: Number of genes and elements screened in combined CRISPR data
 
 ```{r}
-# directory containing CRISPR datasets
-crispr_dir <- "/oak/stanford/groups/engreitz/Projects/Benchmarking/CRISPR_data"
+# load combined K562 CRISPR training dataset
+combinedData <- read_tsv(snakemake@input$combined_crispr, show_col_types = FALSE)
 
-# load CRISPR datasets
-combindedData_file <- file.path(crispr_dir, "EPCrisprBenchmark_ensemble_data_GRCh38.tsv.gz")
-combindedData <- read_tsv(combindedData_file, show_col_types = FALSE)
-
-# filter for valid connections
-combindedData <- filter(combindedData, ValidConnection == "TRUE")
+# make sure that the data only contains valid connections
+combinedData <- filter(combinedData, ValidConnection == "TRUE")
 ```
 
-```{r, fig.height=2.5, fig.width=6}
+```{r}
+# add pretty dataset labels
+combinedData <- combinedData %>% 
+  mutate(dataset_label = case_when(
+    Dataset == "Nasser2021" ~ "Nasser et al., 2021",
+    Dataset == "Gasperini2019" ~ "Gasperini et al., 2019",
+    Dataset == "Schraivogel2020" ~ "Schraivogel et al., 2020"
+  )) %>% 
+  mutate(dataset_label = fct_relevel(dataset_label, "Schraivogel et al., 2020"))
+
 # count the number of unique genes and enhancers in CRISPR data
-n_elements <- combindedData %>% 
+n_elements <- combinedData %>% 
   mutate(enh_id = paste0(chrom, ":", chromStart, "-", chromEnd)) %>% 
+  group_by(dataset_label) %>% 
   summarize(Elements = n_distinct(enh_id),
             Genes = n_distinct(measuredGeneSymbol)) %>% 
   pivot_longer(cols = c(Elements, Genes), names_to = "element", values_to = "count")
 
-# count the number of positive and negative pairs
-n_pairs <- combindedData %>% 
-  filter(!is.na(Regulated)) %>% 
-  count(dataset, Regulated, name = "pairs") %>% 
-  mutate(Regulated = if_else(Regulated == TRUE, true = "Pos.", false = "Neg."))
+# plot the number of elements and genes per dataset
+p1 <- ggplot(n_elements, aes(y = dataset_label, x = count, fill = element)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(group = element, label = count), position = position_dodge(width = 0.9),
+            hjust = -0.05, size = 3.1) + 
+  labs(title = "CRISPR elements and genes", x = "Elements / genes", fill = "Type") +
+  scale_fill_manual(values = c("Elements" = "goldenrod2", "Genes" = "dodgerblue3")) +
+  scale_x_continuous(limits = c(0, 2500)) +
+  theme_classic() +
+  theme(legend.position = "bottom", axis.title.y = element_blank())
 
-# rename datasets
-n_pairs <- n_pairs %>% 
-  mutate(dataset = case_when(
-    dataset == "FlowFISH_K562" ~ "Fulco et al., 2019",
-    dataset == "Gasperini2019" ~ "Gasperini et al., 2019",
-    dataset == "TAPseq" ~ "Schraivogel et al., 2020"
-  )) %>% 
-  mutate(dataset = fct_rev(dataset))
+# count the number of positive and negative pairs
+n_pairs <- combinedData %>% 
+  filter(!is.na(Regulated)) %>% 
+  count(dataset_label, Regulated, name = "pairs") %>% 
+  mutate(Regulated = if_else(Regulated == TRUE, true = "Pos.", false = "Neg."))
 
 # create table with positive and negative numbers of pairs per dataset for labels
 n_pairs_labels <- n_pairs %>% 
@@ -165,133 +165,66 @@ n_pairs_labels <- n_pairs %>%
   mutate(pairs_label = paste0(Pos., " pos.\n", Neg., " neg."),
          total_pairs = Pos. + Neg.)
 
-# create plots
-p1 <- ggplot(n_elements, aes(x = element, y = count, fill = element)) +
-  geom_bar(stat = "identity") +
-  labs(title = "CRISPR data", y = "Elements / genes", x = "") +
-  scale_fill_manual(values = c("Elements" = "goldenrod2", "Genes" = "dodgerblue3")) +
-  theme_classic() +
-  theme(legend.position = "none")
-
-p2 <- ggplot(n_pairs, aes(x = pairs, y = dataset)) +
+# plot the number of E-G pairs per dataset
+p2 <- ggplot(n_pairs, aes(x = pairs, y = dataset_label)) +
   geom_bar(aes(fill = Regulated), stat = "identity") +
-  geom_text(data = n_pairs_labels, aes(x = total_pairs, y = dataset, label = pairs_label),
+  geom_text(data = n_pairs_labels, aes(x = total_pairs, y = dataset_label, label = pairs_label),
             hjust = -0.05, size = 3.1) + 
-  labs(title = "CRISPR E-G pairs", x = "E-G pairs") +
+  labs(title = "CRISPR E-G pairs", x = "E-G pairs", fill = "Result") +
   scale_fill_manual(values = c("Pos." = "firebrick2", "Neg." = "gray55")) +
   scale_x_continuous(limits = c(0, 7000)) +
   theme_classic() +
-  theme(legend.position = "none",  axis.title.y = element_blank())
+  theme(legend.position = "bottom",  axis.title.y = element_blank(), axis.text.y = element_blank())
 
 # arrange plots
-n_crispr_pairs <- plot_grid(p1, p2, ncol = 2, rel_widths = c(0.5, 1))
+n_crispr_pairs <- plot_grid(p1, p2, ncol = 2, rel_widths = c(1, 0.65))
 ```
-
 
 ***
 
 ## Panel E: CRISPR E-G pair properties
-```{r}
-# load merged data for different datasets
-merged_combined <- fread(here("CRISPR_benchmarks/results/CombinedData/expt_pred_merged_annot.txt.gz"))
-merged_fulco <- fread(here("CRISPR_benchmarks/results/Fulco2019/expt_pred_merged_annot.txt.gz"))
-merged_gasperini <- fread(here("CRISPR_benchmarks/results/Gasperini2019/expt_pred_merged_annot.txt.gz"))
-merged_schraivogel <- fread(here("CRISPR_benchmarks/results/Schraivogel2020/expt_pred_merged_annot.txt.gz"))
-
-# filter for valid connections
-merged_combined <- filter(merged_combined, ValidConnection == "TRUE")
-merged_fulco <- filter(merged_fulco, ValidConnection == "TRUE")
-merged_gasperini <- filter(merged_gasperini, ValidConnection == "TRUE")
-merged_schraivogel <- filter(merged_schraivogel, ValidConnection == "TRUE")
-```
 
 ```{r}
-# extract enhancer assay columns for all enhancers in each dataset
-merged_combined_enh <- merged_combined %>% 
-  select(chrom, chromStart, chromEnd, enh_assay_DNase, enh_assay_H3K27ac) %>% 
-  distinct()
+# select enhancer activity measurements to plot and convert to long format
+enh_activity <- combinedData %>% 
+  unite(col = element, chrom, chromStart, chromEnd) %>% 
+  select(element, dataset_label, `DNase-seq` = DHS.RPM, H3K27ac = H3K27ac.RPM) %>% 
+  distinct() %>% 
+  pivot_longer(cols = c(`DNase-seq`, H3K27ac), names_to = "assay", values_to = "rpm")
 
-merged_fulco_enh <- merged_fulco %>% 
-  select(chrom, chromStart, chromEnd, enh_assay_DNase, enh_assay_H3K27ac) %>% 
-  distinct()
-
-merged_gasperini_enh <- merged_gasperini %>% 
-  select(chrom, chromStart, chromEnd, enh_assay_DNase, enh_assay_H3K27ac) %>% 
-  distinct()
-
-merged_schraivogel_enh <- merged_schraivogel %>% 
-  select(chrom, chromStart, chromEnd, enh_assay_DNase, enh_assay_H3K27ac) %>% 
-  distinct()
-
-# combine into one data frame and transform to long format
-enh_activity <- bind_rows(combined = merged_combined_enh, fulco = merged_fulco_enh,
-                          gasperini = merged_gasperini_enh, schraivogel = merged_schraivogel_enh,
-                          .id = "dataset") %>% 
-  pivot_longer(cols = c(enh_assay_DNase, enh_assay_H3K27ac), names_to = "assay",
-               values_to = "reads") %>% 
-  mutate(assay = sub("enh_assay_", "", assay)) %>% 
-  mutate(assay = if_else(assay == "DNase", true = "DNase-seq", false = assay))
-
-# add pretty dataset names for plot
+# add enhancer activity for combined dataset
 enh_activity <- enh_activity %>% 
-    mutate(dataset_long = case_when(
-    dataset == "combined" ~ "Combined CRISPR data",
-    dataset == "fulco" ~ "Fulco et al., 2019",
-    dataset == "gasperini" ~ "Gasperini et al., 2019",
-    dataset == "schraivogel" ~ "Schraivogel et al., 2020") )
-  
-# plot activity for each enhancer
+  mutate(dataset_label = "Combined K562 training") %>% 
+  bind_rows(enh_activity, .)
+
+# plot enhancer activity distributions of all tested CRISPR E-G pairs
 enh_activity_plot <- ggplot(enh_activity,
-                            aes(x = dataset_long, y = reads + 1, color = assay, fill = assay)) +
-  facet_wrap(~assay) +
+                            aes(y = dataset_label, x = rpm + 1, color = assay, fill = assay)) +
+  facet_wrap(~ assay) +
   geom_violin() +
   geom_boxplot(width = 0.1, outlier.shape = NA, color = "black", fill = "NA") +
-  labs(y = "Reads", title = "Enhancer activity") +
-  scale_y_log10() +
+  labs(x = "Reads per million (RPM)", title = "Enhancer activity") +
   scale_fill_manual(values = c("DNase-seq" = "steelblue", "H3K27ac" = "orange")) +
   scale_color_manual(values = c("DNase-seq" = "steelblue", "H3K27ac" = "orange")) +
-  coord_flip() +
+  scale_x_log10() +
   theme_classic() +
   theme(legend.position = "none", text = element_text(size = 12), axis.title.y = element_blank(),
         strip.background = element_blank(), strip.text.x = element_text(size = 12),
         plot.title = element_text(size = 14))
 ```
 
-```{r, fig.height=4, fig.width=2.5}
-# extract distance to TSS for each CRISPR E-G pair
-merged_combined_enh_dist <- merged_combined %>% 
-  filter(pred_id == "baseline", pred_col == "distToTSS") %>% 
-  select(name, pred_col, pred_value)
+```{r}
+# select distance to TSS for each E-G pair
+dist_to_tss <- select(combinedData, name, dataset_label, distanceToTSS)
 
-merged_fulco_enh_dist <- merged_fulco %>% 
-  filter(pred_id == "baseline", pred_col == "distToTSS") %>% 
-  select(name, pred_col, pred_value)
+# add distance to TSS for combined dataset
+dist_to_tss <- dist_to_tss %>% 
+  mutate(dataset_label = "Combined K562 training") %>% 
+  bind_rows(dist_to_tss, .)
 
-merged_gasperini_dist <- merged_gasperini %>% 
-  filter(pred_id == "baseline", pred_col == "distToTSS") %>% 
-  select(name, pred_col, pred_value)
-
-merged_schraivogel_dist <- merged_schraivogel %>% 
-  filter(pred_id == "baseline", pred_col == "distToTSS") %>% 
-  select(name, pred_col, pred_value)
-
-# combine into one data frame
-distance <- bind_rows(combined = merged_combined_enh_dist, fulco = merged_fulco_enh_dist,
-                      gasperini = merged_gasperini_dist, schraivogel = merged_schraivogel_dist,
-                      .id = "dataset") %>% 
-  mutate(pred_col = "Distance to TSS")
-
-# add pretty dataset names for plot
-distance <- distance %>% 
-    mutate(dataset_long = case_when(
-    dataset == "combined" ~ "Combined CRISPR data",
-    dataset == "fulco" ~ "Fulco et al., 2019",
-    dataset == "gasperini" ~ "Gasperini et al., 2019",
-    dataset == "schraivogel" ~ "Schraivogel et al., 2020") )
-
-# plot distance to TSS
-distance_plot <- ggplot(distance, aes(x = dataset, y = pred_value / 1e6)) +
-  facet_wrap(~pred_col) + 
+# plot distance to TSS distribution
+distance_plot <- ggplot(dist_to_tss, aes(x = dataset_label, y = distanceToTSS / 1e6)) +
+  facet_wrap(~"Distance to TSS") +
   geom_violin(color = "gray55", fill = "gray55") +
   geom_boxplot(width = 0.1, outlier.shape = NA, color = "black", fill = "NA") +
   labs(y = "Distance to TSS (Mb)", title = "Distance") +
@@ -314,36 +247,21 @@ eg_properties <- plot_grid(enh_activity_plot, distance_plot, rel_widths = c(2, 0
 ## Detected effect sizes
 
 ```{r}
-# load crispr benchmarking output for the combined CRISPR dataset
-merged <- fread(here("CRISPR_benchmarks/results/CombinedData/expt_pred_merged_annot.txt.gz"))
-
-# filter for valid connections
-merged <- filter(merged, ValidConnection == "TRUE")
-
-# extract distance to TSS baseline predictor only and add CRISPR outcome column for plot
-distance_pred <- merged %>% 
-  filter(pred_id == "baseline", pred_col == "distToTSS") %>% 
-  mutate(crispr_outcome = if_else(Regulated == "TRUE", true = "Pos.", false = "Neg."))
-
-# split by crispr dataset
-distance_pred <- split(distance_pred, f = distance_pred$dataset)
-```
-
-```{r}
 # function to plot the CRISPR effect sizes vs. distance to TSS
 plot_effect_sizes <- function(data, title) {
   
   # plot effect sizes as a function of distanve
-  crispr_effects <- ggplot(data, aes(x = pred_value / 1e6, y = EffectSize,
-                                            color = crispr_outcome)) +
-  geom_point() +
-  geom_point(data = filter(data, crispr_outcome == "Pos.")) +
-  labs(x = "Distance to TSS (Mb)", y = "CRISPRi effect size\n(% expression change)",
-       color = "CRISPR", title = title) +
-  scale_y_continuous(labels = scales::percent, limits = c(-1, 0.5)) +
-  scale_color_manual(values = c("Pos." = "firebrick2", "Neg." = "gray55")) +
-  theme_classic() +
-  theme(legend.position = "bottom")
+  crispr_effects <- ggplot(data,
+                           aes(x = distanceToTSS / 1e6, y = EffectSize, color = crispr_outcome)) +
+    geom_point() +
+    geom_point(data = filter(data, crispr_outcome == "Pos.")) +
+    geom_hline(yintercept = 0, color = "black") +
+    labs(x = "Distance to TSS (Mb)", y = "CRISPRi effect size\n(% expression change)",
+         color = "CRISPR", title = title) +
+    scale_y_continuous(labels = scales::percent, limits = c(-1, 0.5)) +
+    scale_color_manual(values = c("Pos." = "firebrick2", "Neg." = "gray55")) +
+    theme_classic() +
+    theme(legend.position = "bottom")
 
 # add marginal density
 ggMarginal(crispr_effects, type = "density", groupColour = TRUE)
@@ -352,15 +270,17 @@ ggMarginal(crispr_effects, type = "density", groupColour = TRUE)
 ```
 
 ```{r}
-# titles for effect size plots
-es_titles <- c("Fulco et al., 2019", "Gasperini et al., 2019", "Schraivogel et al., 2020")
+# add descriptive column of CRISPR outcome (positive or negative) and order datasets for plots
+combinedData <- combinedData %>% 
+  mutate(crispr_outcome = if_else(Regulated == TRUE, true = "Pos.", false = "Neg.")) %>% 
+  mutate(dataset_label = fct_rev(dataset_label))
 
-# as dataset order for plots
-es_datasets <- c("FlowFISH_K562", "Gasperini2019", "TAPseq")
+# split combined CRISPR data by dataset
+combinedData_per_datasets <- split(combinedData, f = combinedData$dataset_label)
 
-# create effect size plots
-es_plots <- mapply(FUN = plot_effect_sizes, data = distance_pred[es_datasets], title = es_titles,
-                   SIMPLIFY = FALSE)
+# create effect size versus distance to TSS plots for each dataset
+es_plots <- mapply(FUN = plot_effect_sizes, data = combinedData_per_datasets,
+                   title = names(combinedData_per_datasets), SIMPLIFY = FALSE)
 
 # arrange plots into panel
 crispr_effect_sizes <- plot_grid(plotlist = es_plots, nrow = 1)
@@ -370,6 +290,7 @@ crispr_effect_sizes <- plot_grid(plotlist = es_plots, nrow = 1)
 
 ## Assemble figure
 ```{r, fig.height=10, fig.width=12}
+# arrange all panels into one figure
 plot_grid(
   plot_grid(power_gasp_plot, power_schrai_plot, nrow = 1, scale = 0.9, labels = c("b", "c")),
   plot_grid(n_crispr_pairs, eg_properties, nrow = 1, scale = 0.9, labels = c("d", "e")),
@@ -379,7 +300,13 @@ plot_grid(
   )
 
 # save to .pdf file
-ggsave(file = here("analyses/manuscript_figures/plots/sup_crispr_note.pdf"), height = 10,
-       width = 12)
+ggsave(file = "results/manuscript/plots/figS1.1_crispr_training_data.pdf", height = 10, width = 12)
 ```
 
+***
+
+## Session information
+This document was produced using following packages:
+```{r sessionInfo}
+sessionInfo()
+```

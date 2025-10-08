@@ -5,3 +5,9 @@ scratch_dir: "/scratch/users/agschwin/encode_manuscript"
 
 # seed for all random processes
 seed: 20241122
+
+# download urls for required analysis inputs
+download_urls:
+  cCREs: "https://www.encodeproject.org/files/ENCFF286VQG/@@download/ENCFF286VQG.bed.gz"
+  chromHMM: "https://www.encodeproject.org/files/ENCFF963KIA/@@download/ENCFF963KIA.bed.gz"
+  
