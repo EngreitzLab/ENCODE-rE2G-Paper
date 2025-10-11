@@ -1,0 +1,341 @@
+comparisons:
+  MainPredictors:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      CIA: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/CIA/processed/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.predictions.txt.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      correlation_k562_dnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  Nasser2021:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      CIA: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/CIA/processed/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.predictions.txt.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      correlation_k562_dnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz"
+    expt: "../CRISPR_comparison_resources/crispr_data/EPCrisprBenchmark_Nasser2021_K562_GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  Gasperini2019:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      CIA: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/CIA/processed/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.predictions.txt.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      correlation_k562_dnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz"
+    expt: "../CRISPR_comparison_resources/crispr_data/EPCrisprBenchmark_Gasperini2019_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  Schraivogel2020:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      CIA: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/CIA/processed/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.predictions.txt.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      correlation_k562_dnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz"
+    expt: "../CRISPR_comparison_resources/crispr_data/EPCrisprBenchmark_Schraivogel2020_0.13gStd_0.8pwrAt15effect_GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  CombinedHeldout:
+    pred:
+      ABCdnase:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/HCT116_ENCSR000ENM/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/WTC11_ENCSR785ZUI/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/GM12878_ENCSR000EMT/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/Jurkat__Clone_E6-1_ENCSR000EOS/Predictions/EnhancerPredictionsAllPutative.tsv.gz"]
+      ENCODE_rE2G:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_K562_ENCSR000EOT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_WTC11_ENCSR785ZUI_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_GM12878_ENCSR000EMT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_Jurkat__Clone_E6-1_ENCSR000EOS_full_predictions.tsv.gz"]
+      EpiMap:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00492.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00477.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00439.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00760.bed.gz"]
+      correlation_k562_dnase:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_WTC11_ENCSR785ZUI_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_GM12878_ENCSR000EMT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_Jurkat_Clone_E6-1_ENCSR000EOS_full_predictions.tsv.gz"]
+    expt: "../CRISPR_comparison_resources/crispr_data/EPCrisprBenchmark.combined_heldout.annotated.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      ENCODE_rE2G: "../CRISPR_comparison_resources/cell_type_mappings/ENCODE-rE2G_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 1500]
+    expressed_genes: "../CRISPR_comparison_resources/expressed_genes_all_cell_types.tsv"
+  CombinedHeldoutFiltered:
+    pred:
+      ABCdnase:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/HCT116_ENCSR000ENM/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/WTC11_ENCSR785ZUI/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/GM12878_ENCSR000EMT/Predictions/EnhancerPredictionsAllPutative.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/Jurkat__Clone_E6-1_ENCSR000EOS/Predictions/EnhancerPredictionsAllPutative.tsv.gz"]
+      ENCODE_rE2G:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_K562_ENCSR000EOT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_WTC11_ENCSR785ZUI_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_GM12878_ENCSR000EMT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_Jurkat__Clone_E6-1_ENCSR000EOS_full_predictions.tsv.gz"]
+      EpiMap:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00492.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00477.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00439.bed.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00760.bed.gz"]
+      correlation_k562_dnase:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_WTC11_ENCSR785ZUI_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_GM12878_ENCSR000EMT_full_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_Jurkat_Clone_E6-1_ENCSR000EOS_full_predictions.tsv.gz"]
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.heldout_5_cell_types.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      ENCODE_rE2G: "../CRISPR_comparison_resources/cell_type_mappings/ENCODE-rE2G_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 1500]
+    expressed_genes: "../CRISPR_comparison_resources/expressed_genes_all_cell_types.tsv"
+  CominedTrainingFiltered:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      CIA: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/CIA/processed/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.predictions.txt.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      correlation_k562_dnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz"
+    expt: "../CRISPR_comparison_resources/crispr_data/EPCrisprBenchmark.combined_training.annotated.filtered_positives.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_main_benchmarks"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"    
+  PublishedPredictors:
+    pred:
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ABCnasser2021: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/ABC_Nasser_et_al_2021/K562-Roadmap/EnhancerPredictionsAllPutative.GRCh38.txt.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
+      EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
+      GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
+      ENCODE2012_e2g: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/ENCODE2012.e2g/ENCODE2012.e2g.predictions.tsv.gz"
+      Liu2017_roadmap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Liu2017_roadmap/E123.predictions.tsv.gz"
+      Anderson2014_e2g: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Andersson2014.e2g/Andersson2014.e2g.predictions.tsv.gz"
+      Cao2017_JEME: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Cao2017-JEME/Cao2017-JEME.predictions.tsv.gz"
+      Fishilevich2017: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Fishilevich2017-EnhancerGeneLinks.JN/Fishilevich2017-EnhancerGeneLinks.JN.predictions.tsv.gz"
+      Gao2020: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Gao2020-EnhancerGeneLinks.K562only/Gao2020-EnhancerGeneLinks.K562only.predictions.tsv.gz"
+      Granja2019: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Granja2019-EnhancerGeneLinks.JN/Granja2019-EnhancerGeneLinks.JN.predictions.tsv.gz"
+      Sheffield2013: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/Sheffield2013-EnhancerGeneLinks.JN/Sheffield2013-EnhancerGeneLinks.JN.predictions.tsv.gz"
+      TargetFinder: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/TargetFinder/TargetFinder.predictions.tsv.gz"
+      TAPseqRF: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/TAPseqRandomForest/genome_wide_predictions/TAPseqRF_genomewide_300kb_1hit_noExpr.predictions.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_published_pred_figure"
+    cell_type_mapping:
+      ABCnasser2021: "../CRISPR_comparison_resources/cell_type_mappings/ABCnasser21_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
+      EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      ENCODE2012_e2g: "../CRISPR_comparison_resources/cell_type_mappings/ambiguous_cell_type_mapping.txt"
+      Liu2017_roadmap: "../CRISPR_comparison_resources/cell_type_mappings/Liu2017_roadmap_cell_type_mapping.txt"
+      Anderson2014_e2g: "../CRISPR_comparison_resources/cell_type_mappings/ambiguous_cell_type_mapping.txt"
+      Cao2017_JEME: "../CRISPR_comparison_resources/cell_type_mappings/Cao2017_JEME_cell_type_mapping.txt"
+      Fishilevich2017: "../CRISPR_comparison_resources/cell_type_mappings/ambiguous_cell_type_mapping.txt"
+      Granja2019: "../CRISPR_comparison_resources/cell_type_mappings/ambiguous_cell_type_mapping.txt"
+      Sheffield2013: "../CRISPR_comparison_resources/cell_type_mappings/ambiguous_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  BaselinePredsDHS:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      DHS_DNase_dist: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/DHS_reads_by_dist_to_tss.tsv.gz"
+      DHS_DNase_dist_norm: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/DHS_reads_by_dist_to_tss_norm.tsv.gz"
+      DHS_H3K27ac_dist: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/H3K27ac_reads_by_dist_to_tss.tsv.gz"
+      DHS_H3K27ac_dist_norm: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/H3K27ac_reads_by_dist_to_tss_norm.tsv.gz"
+      DHS_element_dist_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/dist_to_gene.tsv.gz"
+      DHS_element_dist_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/dist_to_tss.tsv.gz"
+      DHS_element_nearest_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/nearest_gene.tsv.gz"
+      DHS_element_nearest_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/nearest_tss.tsv.gz"
+      DHS_element_nearest_expr_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/nearest_expressed_gene.tsv.gz"
+      DHS_element_nearest_expr_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/nearest_expressed_tss.tsv.gz"
+      DHS_element_within_100kb_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/within_100kb_of_tss.tsv.gz"
+      DHS_element_within_100kb_expr_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/DHS/K562_ENCSR000EOT/within_100kb_of_expressed_tss.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_baseline_figure"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  BaselinePredsABC:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ABC_DNase_dist: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/DHS_reads_by_dist_to_tss.tsv.gz"
+      ABC_DNase_dist_norm: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/DHS_reads_by_dist_to_tss_norm.tsv.gz"
+      ABC_H3K27ac_dist: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/H3K27ac_reads_by_dist_to_tss.tsv.gz"
+      ABC_H3K27ac_dist_norm: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/H3K27ac_reads_by_dist_to_tss_norm.tsv.gz"
+      ABC_element_dist_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/dist_to_gene.tsv.gz"
+      ABC_element_dist_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/dist_to_tss.tsv.gz"
+      ABC_element_nearest_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/nearest_gene.tsv.gz"
+      ABC_element_nearest_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/nearest_tss.tsv.gz"
+      ABC_element_nearest_expr_gene: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/nearest_expressed_gene.tsv.gz"
+      ABC_element_nearest_expr_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/nearest_expressed_tss.tsv.gz"
+      ABC_element_within_100kb_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/within_100kb_of_tss.tsv.gz"
+      ABC_element_within_100kb_expr_tss: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/BaselinePredictors/ABC/K562_ENCSR000EOT/within_100kb_of_expressed_tss.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_baseline_figure"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  EnhancerActivityBigWig:
+    pred:
+      ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      EnhActAssayOnly: "/oak/stanford/groups/engreitz/Users/agschwin/distal_regulation_paper/predictors/enhancer_activity/results/bigWig/K562/assayOnly_abc_models_crispr.tsv.gz"
+      EnhActAssayDHS: "/oak/stanford/groups/engreitz/Users/agschwin/distal_regulation_paper/predictors/enhancer_activity/results/bigWig/K562/assayDHS_abc_models_crispr.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/EnhActABC_distal_reg_pred_config_bigWig.tsv"
+    include_col: "plot"
+    cell_type_mapping:
+      ABCfull: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      EnhActAssayOnly: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      EnhActAssayDHS: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+    dist_bins_kb: [0, 10, 100, 2500]
+    expressed_genes: "resources/genomic_features/K562_expressed_genes.tsv"
+  AdditionalModels:
+    pred:
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      ENCODE_rE2GdnaseHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GdnaseH3k27ac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GdnaseH3k27acHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GatacMegamap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GatacHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GatacH3k27ac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_h3k27ac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GatacH3k27acHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_h3k27ac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/main_benchmarking_pred_config.tsv"
+    include_col: "crispr_additional_models_figure"
+    dist_bins_kb: [0, 10, 100, 2500]
+  AdditionalModelsAnalysis:
+    pred:
+      ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2G: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/encode_re2g_K562_LOCOCV_full_predictions.tsv.gz"
+      ENCODE_rE2GdnaseHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GdnaseH3k27ac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2GdnaseH3k27acHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      3DcontactK562: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+      3DcontactAvg: "/oak/stanford/groups/engreitz/Users/atan5133/encode_dataset_processing/results/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+    expt: "resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
+    gene_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe: "resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "../CRISPR_comparison_resources/pred_config_files/additional_models_analysis_pred_config.tsv"
+    cell_type_mapping:
+      3DcontactK562: "../CRISPR_comparison_resources/cell_type_mappings/ABCfull_cell_type_mapping.txt"
+      3DcontactAvg: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"      
+    include_col: "crispr_additional_models_figure"
+    dist_bins_kb: [0, 10, 100, 2500]  

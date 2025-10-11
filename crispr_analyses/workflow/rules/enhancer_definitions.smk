@@ -20,7 +20,7 @@ rule download_chromhmm:
     
 # extract enhancers from combined CRISPR data
 rule extract_crispr_enhancers:
-  input: config["share_dir"] + "/CRISPR_data/indirect_effects/formatted/EPCrisprBenchmark.combined_training.annotated.tsv.gz"
+  input: "CRISPR_comparison/resources/crispr_data/EPCrisprBenchmark_combined_data.training_K562.GRCh38.tsv.gz"
   output: temp("results/enhancer_definitions/crispr/combined_crispr_k562_enhancers.bed.gz")
   conda: "../envs/analyses_env.yml"
   script:
@@ -28,7 +28,7 @@ rule extract_crispr_enhancers:
 
 # extract distal enhancers from E-G predictions
 rule extract_enhancers_predictions:
-  input: config["share_dir"] + "/Predictors/ENCODE-rE2G/dhs_only/thresholded_predictions/encode_e2g_predictions_K562_ENCSR000EOT_thresholded_predictions.tsv.gz"
+  input: config["eg_predictions"]["encode_re2g_thresholded"]
   output: temp("results/enhancer_definitions/encode_re2g/encode_re2g_k562_enhancers.bed.gz")
   conda: "../envs/analyses_env.yml"
   shell:
@@ -43,5 +43,7 @@ rule overlap_enhancers:
     univ = "resources/{univ}.bed.gz"
   output: "results/{predictor}/{sample}_enhancers.{univ}.bed.gz"
   conda: "../envs/analyses_env.yml"
+  resources:
+    mem = "8G"
   shell:
     "bedtools intersect -a {input.enh} -b {input.univ} -loj | gzip > {output}"

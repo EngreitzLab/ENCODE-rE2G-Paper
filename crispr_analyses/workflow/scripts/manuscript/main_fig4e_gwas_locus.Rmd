@@ -21,7 +21,7 @@ set.seed(snakemake@params$seed)
 ```
 
 ## Goal
-Make genome browser style plot of the CPEB4 GWAS locus in mutliple cell types, including ENCODE-rE2G
+Make genome browser style plot of the CPEB4 GWAS locus in multiple cell types, including ENCODE-rE2G
 predictions.
 ```{r attachPackages, message=FALSE, warning=FALSE}
 # attach required packages and functions

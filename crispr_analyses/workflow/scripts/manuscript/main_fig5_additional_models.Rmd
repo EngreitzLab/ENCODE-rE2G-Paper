@@ -22,10 +22,10 @@ library(ROCR)
 library(caTools)
 
 # required functions
-proj_dir <- snakemake@config$proj_dir
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+crispr_benchmark_dir <- snakemake@config$crispr_benchmark_dir
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonBootstrapFunctions.R"))
 ```
 
 ```{r}
@@ -133,7 +133,7 @@ feature_plot <- ggplot(model_features_plot, aes(x = model, y = feature, fill = v
 ```{r, fig.height=6, fig.width=6}
 # assemble plot and save to file
 plot_grid(perf_plot, feature_plot, ncol = 1, rel_heights = c(1, 0.35))
-ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_bar.pdf", height = 6,
+ggsave(filename = "results/manuscript/plots/main_fig5g_additional_models_bar.pdf", height = 6,
        width = 6)
 ```
 
@@ -160,7 +160,7 @@ makePRCurvePlot(pr, n_pos = n_pos, pct_pos = pct_pos, plot_name = "Performance a
   theme_classic()
 
 # save PRC plot to file
-ggsave(filename = "results/manuscript/plots/main_fig5_additional_models_prc.pdf", height = 3.5,
+ggsave(filename = "results/manuscript/plots/main_fig5f_additional_models_prc.pdf", height = 3.5,
        width = 7)
 ```
 
@@ -186,8 +186,10 @@ pw_delta_auprc <- pw_delta_auprc %>%
   separate(id, into = c("model1", "model2"), sep = " \\| ")
 
 # save test results to file
-write_tsv(pw_delta_auprc,
-          file = "results/manuscript/tables/main_fig5_additional_models_pairwise_auprc_comparisons.tsv")
+write_tsv(
+  pw_delta_auprc,
+  file = "results/manuscript/tables/main_fig5_additional_models_pairwise_auprc_comparisons.tsv"
+)
 ```
 
 ***

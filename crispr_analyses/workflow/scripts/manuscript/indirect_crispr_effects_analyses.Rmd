@@ -271,7 +271,7 @@ ggplot(crispr, aes(x = dist_to_tss / 1e3, y = direct_vs_indirect_negative,
   theme_classic()
 
 # save plot to pdf
-ggsave(file = "results/manuscript/plots/crispr_direct_vs_indirect_probability.pdf", height = 4,
+ggsave(file = "results/manuscript/plots/figS1.2b_crispr_direct_effect_probability.pdf", height = 4,
        width = 6.2)
 ```
 

@@ -1,0 +1,13 @@
+pred_id	pred_col	boolean	alpha	aggregate_function	fill_value	inverse_predictor	pred_name_long	color
+ENCODE_rE2G	Score	FALSE	0.201	mean	0	FALSE	ENCODE-rE2G	#DC6464
+ENCODE_rE2G	contactFrequency.Feature	FALSE	NA	max	0	FALSE	Megamap 3D contact	#000000
+ENCODE_rE2Gext	Score	FALSE	0.336	mean	0	FALSE	ENCODE-rE2G_Extended	#9B241C
+ENCODE_rE2GdnaseHiC	Score	FALSE	0.243	mean	0	FALSE	"ENCODE-rE2G_A=DNase, C=ENCODE Hi-C"	#BC4440
+ENCODE_rE2GdnaseHiC	3DContact.Feature	FALSE	NA	max	0	FALSE	"K562 ENCODE Hi-C 3D contact (ENCODE-rE2G_A=DNase, C=ENCODE Hi-C)"	#000000
+ENCODE_rE2GdnaseH3k27ac	Score	FALSE	0.2173	mean	0	FALSE	"ENCODE-rE2G_A=DNase x H3K27ac, C=Megamap Hi-C"	#CC5452
+ENCODE_rE2GdnaseH3k27acHiC	Score	FALSE	0.2978	mean	0	FALSE	"ENCODE-rE2G_A=DNase x H3K27ac, C=ENCODE Hi-C"	#AB342E
+ENCODE_rE2GdnaseH3k27acHiC	contactFrequency.Feature	FALSE	NA	max	0	FALSE	"K562 ENCODE Hi-C 3D contact (ENCODE-rE2G_A=DNase x H3K27ac, C=ENCODE Hi-C)"	#000000
+baseline	distToTSS	FALSE	54350	mean	Inf	TRUE	Distance to TSS	#435369
+3DcontactK562	powerlaw_contact	FALSE	NA	max	0	FALSE	Powerlaw 3D contact	#000000
+3DcontactK562	hic_contact	FALSE	NA	max	0	FALSE	Raw K562 3D ENCODE contact	#000000
+3DcontactAvg	hic_contact	FALSE	NA	max	0	FALSE	Raw Megamap 3D contact	#000000

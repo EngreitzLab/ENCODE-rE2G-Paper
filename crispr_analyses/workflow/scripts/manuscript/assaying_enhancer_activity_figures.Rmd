@@ -31,10 +31,10 @@ library(ROCR)
 library(caTools)
 
 # required functions
-proj_dir <- snakemake@config$proj_dir
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+crispr_benchmark_dir <- snakemake@config$crispr_benchmark_dir
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonBootstrapFunctions.R"))
 ```
 
 ## Used data
@@ -171,10 +171,10 @@ p2 <- ggplot(bs_perf_top_assays, aes(y = fct_reorder(pred_name_long, .x = full),
 plot_grid(p1, p2, nrow = 1, rel_widths = c(0.75, 1))
 
 # save plot to pdf
-ggsave(filename = "results/manuscript/plots/main_fig5f_enh_activity.pdf", height = 3.5, width = 5.5)
+ggsave(filename = "results/manuscript/plots/main_fig5d_enh_activity.pdf", height = 3.5, width = 5.5)
 
 # save top 10 assay performance to file for use in other analyses
-write_csv(bs_perf_top_assays, file = "results/manuscript/tables/enh_activity_top_assays.csv")
+write_tsv(bs_perf_top_assays, file = "results/manuscript/tables/enh_activity_top_assays.tsv")
 ```
 
 ## Figure for supplementary note
@@ -245,7 +245,7 @@ p2 <- ggplot(bs_perf_hist, aes(y = fct_reorder(pred_name_long, .x = full), x = f
 plot_grid(p1, p2, rel_widths = c(1, 0.7), scale = c(1, 0.8), labels = c("a", "b"))
 
 # save plot to .pdf for manuscript
-ggsave(filename = "results/manuscript/plots/figS11_enhancer_activity.pdf", height = 4, width = 9)
+ggsave(filename = "results/manuscript/plots/figS10_enhancer_activity.pdf", height = 4, width = 9)
 ```
 
 ***

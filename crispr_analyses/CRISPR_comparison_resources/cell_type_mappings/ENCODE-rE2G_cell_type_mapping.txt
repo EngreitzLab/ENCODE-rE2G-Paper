@@ -1,0 +1,6 @@
+experiment  predictions
+BJAB  "naive B cell"
+Jurkat  "Jurkat, Clone E6-1"
+LNCAP "prostate gland"
+PrimaryHepatocytes  "hepatocyte"
+THP1  "CD14-positive monocyte"

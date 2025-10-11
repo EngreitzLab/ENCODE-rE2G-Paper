@@ -29,10 +29,10 @@ library(ROCR)
 library(caTools)
 
 # required functions
-proj_dir <- snakemake@config$proj_dir
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+crispr_benchmark_dir <- snakemake@config$crispr_benchmark_dir
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonBootstrapFunctions.R"))
 source("workflow/scripts/random_gene_pred_functions.R")
 ```
 
@@ -322,7 +322,7 @@ plot_grid(
   scale = 0.95
   )
 
-ggsave(filename = "results/manuscript/plots/figS8_additional_crispr_benchmarks.pdf", height = 8,
+ggsave(filename = "results/manuscript/plots/figS7_additional_crispr_benchmarks.pdf", height = 8,
        width = 15)
 ```
 

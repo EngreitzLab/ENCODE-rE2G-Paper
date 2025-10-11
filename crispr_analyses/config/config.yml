@@ -1,10 +1,19 @@
-# directories for project
-proj_dir: "/oak/stanford/groups/engreitz/Users/agschwin/distal_regulation_paper"
-share_dir: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions"
+# directories containing CRISPR benchmarking pipeline and results (update as needed)
+crispr_benchmark_dir: "CRISPR_comparison"
+
+# directory for temporary output, e.g. on HPC scratch space (update as needed)
 scratch_dir: "/scratch/users/agschwin/encode_manuscript"
 
 # seed for all random processes
 seed: 20241122
+
+# paths to specific E-G predictions used in manuscript analyses (updated as needed)
+eg_predictions:
+  encode_re2g: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/full_predictions/encode_e2g_predictions_K562_ENCSR000EOT_full_predictions.tsv.gz"
+  encode_re2g_thresholded: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/thresholded_predictions/encode_e2g_predictions_K562_ENCSR000EOT_thresholded_predictions.tsv.gz"
+  encode_re2g_bedpe: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/dhs_only/thresholded_bedpe/encode_e2g_predictions_K562_ENCSR000EOT_thresholded_predictions.bedpe.gz"
+  encode_re2g_extended_locov: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv"
+  encode_re2g_extended_thresholded: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/encode_e2g_predictions_threshold0.336.tsv.gz"
 
 # download urls for required analysis inputs
 download_urls:

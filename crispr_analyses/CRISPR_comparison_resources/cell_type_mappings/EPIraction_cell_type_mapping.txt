@@ -1,0 +1,6 @@
+experiment  predictions
+K562  Blood.Myeloid.K562
+GM12878 Blood.Lymphoid.GM12878
+WTC11 Pluripotent.iPSCs
+Jurkat  Blood.Leukemia.Jurkat
+HCT116  Digestive.Colon.Carcinoma.HCT116

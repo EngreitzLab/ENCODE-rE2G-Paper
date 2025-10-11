@@ -31,10 +31,10 @@ library(cowplot)
 library(DT)
 
 # required functions
-proj_dir <- snakemake@config$proj_dir
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+crispr_benchmark_dir <- snakemake@config$crispr_benchmark_dir
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonBootstrapFunctions.R"))
 ```
 
 ***
@@ -232,7 +232,8 @@ plot_recall_heldout <- ggplot(weighted_recall_heldout,
 plot_grid(plot_precision_heldout, plot_recall_heldout, nrow = 1)
 
 # save plot to pdf
-ggsave("results/manuscript/plots/figS1.2_crispr_performance_heldout.pdf", height = 5, width = 8)
+ggsave("results/manuscript/plots/extended_data_fig3f_crispr_performance_heldout.pdf", height = 5,
+       width = 8)
 ```
 
 Significance of differences in weighted Precision between predictors on held-out CRISPR data: 
@@ -358,7 +359,8 @@ makePRCurvePlot(pr, n_pos = n_pos, pct_pos = pct_pos, plot_name = title,
   theme_classic()
 
 # save plot to pdf
-ggsave("results/manuscript/plots/main_fig2d_crispr_prc_heldout.pdf", height = 4, width = 6.25)
+ggsave("results/manuscript/plots/extended_data_fig3e_crispr_prc_heldout.pdf", height = 4,
+       width = 6.25)
 ```
 
 ***
@@ -433,8 +435,8 @@ plot_grid(
 )
 
 # save plot to pdf
-ggsave("results/manuscript/plots/figS1.2_all_crispr_performance_heldout.pdf", height = 4,
-       width = 15)
+ggsave("results/manuscript/plots/extended_data_fig3g_all_crispr_performance_heldout.pdf",
+       height = 4, width = 15)
 ```
 
 Significant differences between datasets in AUPRC:

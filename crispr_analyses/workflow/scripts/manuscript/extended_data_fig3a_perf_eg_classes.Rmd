@@ -32,10 +32,10 @@ library(ROCR)
 library(caTools)
 
 # required functions
-proj_dir <- snakemake@config$proj_dir
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonLoadInputData.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonPlotFunctions.R"))
-source(file.path(proj_dir, "CRISPR_benchmarks/workflow/scripts/crisprComparisonBootstrapFunctions.R"))
+crispr_benchmark_dir <- snakemake@config$crispr_benchmark_dir
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonLoadInputData.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonPlotFunctions.R"))
+source(file.path(crispr_benchmark_dir, "workflow/scripts/crisprComparisonBootstrapFunctions.R"))
 ```
 
 ***
@@ -296,23 +296,7 @@ gene_class <- ggplot(perf_gene_class, aes(x = full, y = pred_name_long, color = 
 ```
 
 ## Create figure
-Arrange plots into figure panel for supplementary materials.
-```{r fig.height=4.5, fig.width=18}
-# arrange plots into one figure
-plot_grid(
-  p_dist,
-  p_es + theme(axis.text.y = element_blank()),
-  p_h3k27ac + theme(axis.text.y = element_blank()),
-  gene_class + theme(axis.text.y = element_blank()),
-  nrow = 1,
-  rel_widths = c(1, 0.61, 0.61, 0.61)
-)
-
-# save plot to pdf
-ggsave(filename = "results/manuscript/plots/crispr_performance_eg_classes.pdf", height = 4.5,
-       width = 18)
-```
-
+Arrange plots into figure panel for Extended Data Figure 3.
 ```{r fig.height=4.5, fig.width=18}
 # arrange plots into one figure
 plot_grid(
@@ -325,7 +309,7 @@ plot_grid(
 )
 
 # save plot to pdf
-ggsave(filename = "results/manuscript/plots/crispr_performance_eg_classes_pdirect.pdf",
+ggsave(filename = "results/manuscript/plots/extended_data_figure3a_crispr_perf_eg_classes.pdf",
        height = 4.5, width = 18)
 ```
 
