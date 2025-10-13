@@ -1,4 +1,4 @@
-# Additonal analyses
+# Additional analyses
 Code in this directory was used to perform following additional analysis:
 
 - Code and reference files in the `enhancer_synergy` directory were used to produce the analysis for the section 'Super-additive functions of distal enhancers,' including Fig. 6 and Extended Data Fig. 9

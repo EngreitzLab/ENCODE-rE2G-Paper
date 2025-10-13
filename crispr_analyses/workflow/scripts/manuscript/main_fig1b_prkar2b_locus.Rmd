@@ -10,11 +10,8 @@ output:
 ---
 
 ```{r setupDocument, include=FALSE}
-# save.image("test.rda")
-# stop()
-
 # set output html chunk options
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
@@ -23,7 +20,6 @@ set.seed(snakemake@params$seed)
 ## Goal
 Make genome browser style plot of the PRKAR2B locus showing ENCODE-rE2G predictions and features,
 and CRISPR hits.
-
 ```{r attachPackages, message=FALSE, warning=FALSE}
 # attach required packages and functions
 library(Gviz)
@@ -254,7 +250,7 @@ for (i in key_cell_types) {
 
 ### Make detailed locus plot
 Plot detailed tracks for K562 and related cell types.
-```{r detailedLocusPlot}
+```{r detailedLocusPlot, fig.height=6, fig.width=10}
 # combine all tracks into one list
 detailed_tracks <- c(chr_track, axis_track, genes_track, k562_e2g_track, k562_e2g_ext_track,
                 crispr_pos_track, crispr_elements_track, k562_h3k27ac_track, k562_dnase_track,
@@ -264,7 +260,15 @@ detailed_tracks <- c(chr_track, axis_track, genes_track, k562_e2g_track, k562_e2
 detailed_track_sizes <- c(0.5, 0.6, 0.3, 0.5, 0.5, 0.5, 0.15, 0.6, 0.6, 0.15,
                           rep(c(0.3, 0.4), length(key_ct_tracks) / 2))
 
-# make plot
+# arrange locus plot
+plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), sizes = detailed_track_sizes,
+           background.title = "transparent", col.axis = "black", fontcolor.title = "black",
+           fontface.title = 1, rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+```
+
+```{r savePlot1}
+# save locus plot to output .pdf file
 pdf("results/manuscript/plots/main_fig1b_prkar2b_detailed_view.pdf", height = 6, width = 10)
 plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), sizes = detailed_track_sizes,
@@ -438,14 +442,22 @@ create_DataTrack <- function(range, name, genome, gradient, gradient_range, chro
 }
 ```
 
-```{r plotAllDNaseExperimets}
+```{r plotAllDNaseExperimets, fig.height=4.5, fig.width=10}
 # create data tracks for ENCODE-E2G predictions in all samples
 e2g_score_tracks <- lapply(pred_scores[cluster_order], FUN = create_DataTrack,
                            name = "e2g", genome = "hg38", gradient = c("#ffc2c2", "#ad2424"),
                            gradient_range = c(0.201, 1), chromosome = as.character(seqnames(locus)),
                            from = start(locus), to = end(locus))
 
-# make plot
+# arrange locus plot
+plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+```
+
+```{r savePlot2}
+# save locus plot to output .pdf file
 pdf("results/manuscript/plots/main_fig1b_prkar2b_allExperiments.pdf", height = 4.5, width = 10)
 plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), background.title = "transparent",
@@ -454,7 +466,7 @@ plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locu
 dev.off()
 ```
 
-```{r plotDefaultDNaseExperimets}
+```{r plotDefaultDNaseExperimets, fig.height=4.5, fig.width=10}
 # create data tracks for ENCODE-E2G predictions in all samples
 e2g_score_tracks_default <- lapply(pred_scores_default[cluster_order_default],
                                    FUN = create_DataTrack, name = "e2g", genome = "hg38",
@@ -463,7 +475,15 @@ e2g_score_tracks_default <- lapply(pred_scores_default[cluster_order_default],
                                    chromosome = as.character(seqnames(locus)),
                                    from = start(locus), to = end(locus))
 
-# make plot
+# arrange locus plot
+plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqnames(locus)),
+           from = start(locus), to = end(locus), background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+```
+
+```{r savePlot3}
+# save locus plot to output .pdf file
 pdf("results/manuscript/plots/main_fig1b_prkar2b_defaultExperiments.pdf", height = 4.5, width = 10)
 plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), background.title = "transparent",
@@ -472,14 +492,22 @@ plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqna
 dev.off()
 ```
 
-```{r plotFullLocusPlot}
+```{r plotFullLocusPlot, fig.height=10, fig.width=10}
 # combine all tracks into one list
 all_tracks <- c(detailed_tracks, e2g_score_tracks_default)
 
 # relative heights for all tracks
 track_sizes_full <- c(detailed_track_sizes, rep_along(e2g_score_tracks_default, 0.025))
 
-# make plot
+# arrange locus plot
+plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), from = start(locus),
+           to = end(locus), sizes = track_sizes_full, background.title = "transparent",
+           col.axis = "black", fontcolor.title = "black", fontface.title = 1,
+           rotation.title = 0, cex.axis = 0.5, cex.title = 0.6, margin = 40)
+```
+
+```{r savePlot4}
+# save locus plot to output .pdf file
 pdf("results/manuscript/plots/main_fig1b_prkar2b_full_view.pdf", height = 10, width = 10)
 plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), from = start(locus),
            to = end(locus), sizes = track_sizes_full, background.title = "transparent",
