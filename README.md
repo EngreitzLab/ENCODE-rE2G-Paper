@@ -28,16 +28,16 @@ contact, enhancer-gene correlation and promoter classes.
 Following pipelines were used to benchmark enhancer-gene predictions against CRISPR, eQTL and GWAS
 data:
 
-### CRISPR benchmarks###
+### CRISPR benchmarks
 A copy of the CRISPR benchmarking used to intersect predictions with CRISPR enhancer perturbation
 results can be found in the **crispr_analyses** subdirectory or in the original GitHib repository
 for general use: https://github.com/EngreitzLab/CRISPR_comparison.
 
-### eQTL benchmarks###
+### eQTL benchmarks
 All eQTL benchmarking analyses, including figures shown in the paper, were computed using the eQTL
 benchmarking pipeline available here: https://github.com/EngreitzLab/eQTLEnrichment.
 
-### GWAS benchmarks###
+### GWAS benchmarks
 The GWAS benchmarks were performed using the GWAS benchmarking pipeline available here: 
 https://github.com/Deylab999MSKCC/e2g-benchmarking. Additional analysis code for GWAS-related
 analyses is available in the *gwas_analyses* subdirectory.
