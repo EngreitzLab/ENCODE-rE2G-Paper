@@ -72,8 +72,8 @@ rs540538026   OR4F29	OR4F5
 rs62635286    OR4F29	OR4F5
 ```
 
-**Step 5 script Enrichment_calc_GWAS.R & Recall_calc_GWAS.R**: Run enrichment and recall analysis
+**Step 5. Enrichment_calc_GWAS.R & Recall_calc_GWAS.R**: Run enrichment and recall analysis
 for ENCODE-E2G+PoPS (using top 2 of each method and seeing if there is overlap between two).
 
-**Step 6 process_heatmap_matrix.R**: Processing the matrix to plot for heatmap based on the
+**Step 6. process_heatmap_matrix.R**: Processing the matrix to plot for heatmap based on the
 enrichment and recall scores computed in the previous step.
