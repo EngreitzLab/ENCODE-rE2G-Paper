@@ -1,9 +1,9 @@
 # Analyses for the ENCODE distal regulation companion paper
-
+This repository contains analysis code for analyses presented in the ENCODE distal regulation
+companion paper, as well as links to the used benchmarking pipelines.
 
 ## Analysis code
-This repository contains analysis code for analyses presented in the ENCODE distal regulation
-companion paper. Analyses can be found in following subdirectories:
+The following subdirectories contain code used to perform analyses shown in the paper:
 
 ### crispr_analyses:
 Snakemake workflow for CRISPR benchmarking and other related analyses results shown in Main
