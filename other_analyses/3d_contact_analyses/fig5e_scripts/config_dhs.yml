@@ -1,0 +1,27 @@
+
+# comparisons to be performed by the pipeline, copy-paste example for a template
+comparisons:
+  example:
+    pred:
+      ENCODEE2G_ext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/Extended/K562/rE2G_LOCOV_crispr_predictions.tsv"
+      ABC_insitu: "/oak/stanford/groups/akundaje/kmualim/20240404_New_ABC_Predictions/dhs_only/K562_insitu/Predictions/EnhancerPredictionsAllPutative_noPromoter.tsv.gz"
+      ABC_PolII: "/oak/stanford/groups/akundaje/kmualim/20240404_New_ABC_Predictions/dhs_only/K562_PolII/Predictions/EnhancerPredictionsAllPutative_noPromoter.tsv.gz"
+      ABC_intact: "/oak/stanford/groups/akundaje/kmualim/20240404_New_ABC_Predictions/dhs_hic/K562_EnhancerPredictionsAllPutative_noPromoter.tsv.gz"
+      ABC_powerlaw: "/oak/stanford/groups/akundaje/kmualim/20240404_New_ABC_Predictions/dhs_only/K562_insitu/Predictions/EnhancerPredictionsAllPutative_noPromoter.tsv.gz"
+      ABC_DHS_megamap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/abc_predictions_K562_ENCSR000EOT_full_predictions.tsv.gz"
+      ABC_Wang: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/preds/DHS_HiC_K562_EnhancerPredictionsAllPutative_noPromoter.pet_features.tsv"
+      ABC_CTCF: "/oak/stanford/groups/engreitz/Users/kmualim/ABC-Enhancer-Gene-Prediction/results/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
+        #ABC_CTCF: "/oak/stanford/groups/akundaje/kmualim/20240404_New_ABC_Predictions/K562/results/K562_CTCF/Predictions/EnhancerPredictionsAllPutative.tsv.gz.1.tsv.gz" 
+        #ABC_PET: "/oak/stanford/groups/akundaje/kmualim/K562_AllFeatures_NAfilled.ContactFeatures.no_prom.tsv.gz"
+        #CIA: "/oak/stanford/groups/akundaje/kmualim/K562_EnhancerPredictionsAllPutative_CTCF_HiC_CIA.txt.gz"
+    expt: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/crispr_data/EPCrisprBenchmark_ensemble_data_GRCh38.tsv.gz"
+    gene_universe: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/genome_annotations/CollapsedGeneBounds.hg38.bed"
+    tss_universe:  "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/genome_annotations/CollapsedGeneBounds.hg38.TSS500bp.bed"
+    pred_config: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/example/pred_config_dhs.txt"
+    cell_type_mapping: 
+      ABC: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/example/ABC_cell_type_mapping.txt"
+    dist_bins_kb: [0, 20, 100, 2500]
+    expressed_genes: "/oak/stanford/groups/engreitz/Users/kmualim/CRISPR_comparison/resources/genomic_features/K562_expressed_genes.tsv"
+    gene_features: Null
+    enh_features: Null
+    enh_assays: Null

@@ -1,0 +1,10 @@
+pred_id	pred_col	boolean	alpha	aggregate_function	fill_value	inverse_predictor	pred_name_long	color
+ENCODEE2G_ext	ENCODE-rE2G.Score	FALSE	0.336	mean	0	FALSE	"ENCODE-rE2G_Extended"	"#9B241C"
+ABC_powerlaw	powerlaw.Score	FALSE	0.02	sum	0	FALSE	"ABC_A=DNase, C~1/distance"	"#9BCAE9"
+ABC_insitu	ABC.Score	FALSE	0.02	sum	0	FALSE	"ABC_A=DNase, C=ENCODE Hi-C (insitu)"	"#00008B"
+ABC_intact	ABC.Score	FALSE	0.02	sum	0	FALSE	"ABC_A=DNase, C=ENCODE Hi-C (intact)"	"#FF7782"
+ABC_DHS_megamap	ABC.Score	FALSE	0.201	sum	0	FALSE	"ABC_A=DNase, C=megamap Hi-C"	"#5496CE"
+ABC_Wang	ABC.Score_pet_cross	FALSE	0.02	sum	0	TRUE	"CTCF spanning"	"#322C94"
+ABC_Wang	ABC.Score_pet_outside	FALSE	0.02	sum	0	FALSE	"CTCF crossing"	"#625BC7"
+ABC_CTCF	ABC.Score	FALSE	0.02	sum	0	FALSE	"CTCF ChIA-PET"	"#ED1C24"
+ABC_PolII	ABC.Score	FALSE	0.02	sum	0	FALSE	"PolII ChIA-PET"	"#F9C5DB"
