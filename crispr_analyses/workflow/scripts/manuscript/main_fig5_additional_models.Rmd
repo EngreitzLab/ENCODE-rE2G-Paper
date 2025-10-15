@@ -140,7 +140,7 @@ ggsave(filename = "results/manuscript/plots/main_fig5g_additional_models_bar.pdf
 ***
 
 ## Plot PRC for each model
-```{r, fig.height=3.5, fig.width=9}
+```{r, fig.height=3.5, fig.width=8}
 # process merged data for benchmarking analyses, including filtering for ValidConnection == TRUE
 merged <- processMergedData(merged, pred_config = pred_config, filter_valid_connections = TRUE,
                             include_missing_predictions = TRUE)
@@ -161,7 +161,7 @@ makePRCurvePlot(pr, n_pos = n_pos, pct_pos = pct_pos, plot_name = "Performance a
 
 # save PRC plot to file
 ggsave(filename = "results/manuscript/plots/main_fig5f_additional_models_prc.pdf", height = 3.5,
-       width = 9)
+       width = 8)
 ```
 
 ***
