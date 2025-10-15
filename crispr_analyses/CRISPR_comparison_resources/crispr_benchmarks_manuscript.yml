@@ -311,7 +311,7 @@ comparisons:
       ENCODE_rE2GdnaseHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
       ENCODE_rE2GdnaseH3k27ac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
       ENCODE_rE2GdnaseH3k27acHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/dhs_h3k27ac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
-      ENCODE_rE2GatacMegamap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
+      ENCODE_rE2Gatac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
       ENCODE_rE2GatacHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
       ENCODE_rE2GatacH3k27ac: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_h3k27ac_megamap/rE2G_LOCOV_crispr_predictions.tsv.gz"
       ENCODE_rE2GatacH3k27acHiC: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/atac_h3k27ac_intact_hic/rE2G_LOCOV_crispr_predictions.tsv.gz"
