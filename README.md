@@ -1,13 +1,17 @@
-# Analyses for the ENCODE distal regulation companion paper
-This repository contains analysis code for analyses presented in the ENCODE distal regulation
-companion paper, as well as links to the used benchmarking pipelines.
+# Analysis code for the ENCODE-rE2G paper
+This repository contains code used for analyses presented in the ENCODE-rE2G ENCODE companion
+paper, as well as links to the used benchmarking pipelines.
 
-## Setting up the repository
+### Using the ENCODE-rE2G model
+To apply pre-trained ENCODE-rE2G models or train new models, go to the ENCODE-rE2G model repository
+found here: https://github.com/EngreitzLab/ENCODE_rE2G.
+
+## Setting up the analysis code repository
 To obtain a local copy of the repository, including the `crispr_analyses/CRISPR_comparison`
 submodule containing the CRISPR benchmarking pipeline version used for analyses in this paper, open
 a terminal and run:
 ```console
-git clone --recurse-submodules git@github.com:EngreitzLab/ENCODE-Distal-Regulation-Paper.git
+git clone --recurse-submodules git@github.com:EngreitzLab/ENCODE-rE2G-Paper.git
 ```
 
 ## Analysis code
