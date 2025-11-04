@@ -39,6 +39,10 @@ workflows (e.g., enhancer activity ABC, baseline predictors, E-G correlation pre
 `CRISPR_comparison_resources/crispr_benchmarks_manuscript.yml` can be modified with updated local
 paths to downloaded files.
 
+All software dependencies other than snakemake and conda will automatically installed when using the
+`--use-conda` flag. Note that when running the workflow for the first time, building the conda
+environment might take some time depending on your system (typically less than 30 minutes).
+
 To run the workflow with adapted input file paths, activate snakemake and run the following command:
 ```sh
 # go into the CRISPR benchmarking subdirectory
@@ -60,7 +64,11 @@ snakemake --use-conda --profile <cluster_profile> --configfile ../CRISPR_compari
 
 ## Running the CRISPR analyses workflow
 After running the CRISPR benchmarking pipeline, the CRISPR analysis workflow can be run to reproduce
-manuscript analyses:
+manuscript analyses. All software dependencies other than snakemake and conda will automatically
+installed when using the `--use-conda` flag. Note that when running the workflow for the first time,
+building the conda environment might take some time depending on your system (typically less than 30
+minutes).
+
 ```sh
 # execute full workflow to generate all analysis results (-n = dryrun, remove to execute workflow)
 snakemake --use-conda --profile <cluster_profile> -j30 -n

@@ -10,9 +10,12 @@ found here: https://github.com/EngreitzLab/ENCODE_rE2G.
 To obtain a local copy of the repository, including the `crispr_analyses/CRISPR_comparison`
 submodule containing the CRISPR benchmarking pipeline version used for analyses in this paper, open
 a terminal and run:
+
 ```console
 git clone --recurse-submodules git@github.com:EngreitzLab/ENCODE-rE2G-Paper.git
 ```
+
+This should take less than a minute.
 
 ## Analysis code
 The following subdirectories contain code used to perform analyses shown in the paper:
