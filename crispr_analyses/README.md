@@ -1,7 +1,7 @@
 # CRISPR benchmarking related analyses
 This snakemake workflow performs CRISPR benchmarking and other related analyses presented in the
-ENCODE distal regulation companion paper. Most analyses depend on running the CRISPR benchmarking
-pipeline (see below).
+ENCODE-rE2G ENCODE companion paper. Most analyses depend on running the CRISPR benchmarking pipeline 
+(see below).
 
 The workflow performs analyses shown in the following figures, tables and supplementary notes:
 - Fig 1b

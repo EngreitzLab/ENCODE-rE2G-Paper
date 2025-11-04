@@ -462,6 +462,8 @@ corr_plot <- ggcorrplot(cor_matrix, hc.order = TRUE, type = "lower", lab = TRUE,
 ***
 
 ## Correlation of predictor scores with CRISPRi effect sizes
+Compute and plot Pearson correlation coefficients between predictor scores and measured CRISPR
+perturbation effect sizes.
 ```{r}
 # helper function to compute correlation coefficient including confidence intervals and p-value
 compute_corr <- function(x) {
@@ -491,6 +493,11 @@ pearson_cor <- merged_plot %>%
   bind_rows(.id = "pred_name_long") %>% 
   mutate(pred_name_long = fct_reorder(pred_name_long, cor_coeff, .desc = TRUE))
 
+# save correlations with CRISPR effect sizes to table
+write_tsv(pearson_cor, file = "results/manuscript/tables/extended_data_fig2_crispr_correlation.tsv")
+```
+
+```{r}
 # get colors for correlation predictors and adapt to new distance name
 pred_colors_cor <- pred_config_main %>% 
   filter(pred_uid %in% plot_preds) %>% 
@@ -512,6 +519,65 @@ crispr_corr <- ggplot(pearson_cor, aes(x = pred_name_long, y = cor_coeff, color 
   theme(axis.title.y = element_blank(), plot.title = element_text(size = 15, hjust = 1.25),
         legend.position = "none")
 ```
+
+### Statistical significance
+Calculate statistical between ENCODE-rE2G and corresponding ABC models.
+```{r}
+# function to test for statistical significance between two correlation coefficients taken from
+# here: https://stats.stackexchange.com/questions/64152/are-two-pearson-correlation-coefficients-different
+cor.diff.test = function(x1, x2, y1, y2, method = "pearson") {
+  cor1 = cor.test(x1, x2, method=method)
+  cor2 = cor.test(y1, y2, method=method)
+  
+  r1 = cor1$estimate
+  r2 = cor2$estimate
+  n1 = sum(complete.cases(x1, x2))
+  n2 = sum(complete.cases(y1, y2))
+  fisher = ((0.5*log((1+r1)/(1-r1)))-(0.5*log((1+r2)/(1-r2))))/((1/(n1-3))+(1/(n2-3)))^0.5
+  
+  p.value = (2*(1-pnorm(abs(fisher))))
+  
+  result= list(
+    "cor1" = list(
+      "estimate" = as.numeric(cor1$estimate),
+      "p.value" = cor1$p.value,
+      "n" = n1
+    ),
+    "cor2" = list(
+      "estimate" = as.numeric(cor2$estimate),
+      "p.value" = cor2$p.value,
+      "n" = n2
+    ),
+    "p.value.twosided" = as.numeric(p.value),
+    "p.value.onesided" = as.numeric(p.value) / 2
+  )
+  cat(paste(sep="",
+            "cor1: r=", format(result$cor1$estimate, digits=3), ", p=", format(result$cor1$p.value, digits=3), ", n=", result$cor1$n, "\n",
+            "cor2: r=", format(result$cor2$estimate, digits=3), ", p=", format(result$cor2$p.value, digits=3), ", n=", result$cor2$n, "\n",
+            "diffence: p(one-sided)=", format(result$p.value.onesided, digits=3), ", p(two-sided)=", format(result$p.value.twosided, digits=3), "\n"
+  ))
+  return(result);
+}
+```
+
+```{r include=FALSE}
+# comparison between ENCODE-rE2G and ABC (DNase-only)
+e2g <- filter(merged_plot, pred_uid == "ENCODE_rE2G.Score")
+abc_dnase <- filter(merged_plot, pred_uid == "ABCdnase.ABC.Score")
+comp1 <- cor.diff.test(x1 = e2g$pred_value, x2 = e2g$EffectSize,
+                       y1 = abc_dnase$pred_value, y2 = abc_dnase$EffectSize,
+                       method = "pearson")
+
+# Comp 2 ENCODE-E2G_ext vs ABC (Full)
+e2g_ext <- filter(merged_plot, pred_uid == "ENCODE_rE2Gext.Score")
+abc_full <- filter(merged_plot, pred_uid == "ABCfull.ABC.Score")
+comp2 <- cor.diff.test(x1 = e2g_ext$pred_value, x2 = e2g_ext$EffectSize,
+                       y1 = abc_full$pred_value, y2 = abc_full$EffectSize,
+                       method = "pearson")
+```
+
+Two-sided p-value ENCODE-rE2G vs. ABC^A=DNase, C=Average Hi-C^: `r comp1$p.value.twosided`
+Two-sided p-value ENCODE-rE2G_Extended vs. ABC^Activity=DHS*H3K27ac, Contact=ENCODE Hi-C^: `r comp1$p.value.twosided`
 
 ***
 
