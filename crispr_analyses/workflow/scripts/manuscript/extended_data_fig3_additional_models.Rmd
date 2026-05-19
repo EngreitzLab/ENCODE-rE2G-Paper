@@ -278,10 +278,6 @@ crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>%
 crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>% 
   mutate(h3k27ac_dhs_ratio = (H3K27ac + 0.001) / (DHS + 0.001))
 
-# compute Z-scores for H3K27ac and K562 Hi-C signal 
-# crispr_h3k27ac_hic_pos <- crispr_h3k27ac_hic_pos %>% 
-#   mutate(h3k27ac_zscore = scale(H3K27ac), K562HiC_zscore = scale(K562HiC))
-
 # calculate average ratios
 avg_h3k27ac_dhs_ratio <- median(crispr_h3k27ac_hic_pos$h3k27ac_dhs_ratio)
 avg_k562_avg_hic_ratio <- median(crispr_h3k27ac_hic_pos$K562HiC_over_expected)
@@ -338,7 +334,7 @@ plot_grid(p_add_hic + theme(legend.position = "left"),
           align = "h")
 
 # save plot to file
-ggsave(file = "results/manuscript/plots/extended_fig3bcd_additional_models.pdf", height = 4,
+ggsave(file = "results/manuscript/plots/extended_data_fig3bcd_additional_models.pdf", height = 4,
        width = 14)
 ```
 

@@ -38,14 +38,15 @@ delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = 10000,
 
 # add pretty predictor names
 ci_auprc <- left_join(ci_auprc, select(pred_config, pred_uid, pred_name_long),
-#                      by = c("id" = "pred_uid"))
+                      by = c("id" = "pred_uid"))
 
 # get color for each predictor
 pred_colors <- deframe(select(pred_config, pred_name_long, color))
 
 # GENERATE FIG5E
 pdf("auprc_ci.pdf", width=15, height=5)
- plot AUPRC barplot
+
+#plot AUPRC barplot
 ggplot(ci_auprc, aes(y = fct_reorder(pred_name_long, .x = full), x = full, fill = pred_name_long)) +
   geom_bar(stat = "identity") + 
   geom_errorbar(aes(xmin = lower, xmax = upper), position = position_dodge(0.9), width = 0.4,

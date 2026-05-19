@@ -72,7 +72,7 @@ axis_track <- GenomeAxisTrack()
 make_e2g_track <- function(file, name, color = "gray", gene = NULL, scale_score = FALSE,
                            remove_promoters = TRUE, plot.outside = TRUE) {
   
-  # load e2g file
+  # load E2G file
   e2g <- import(file, format = "bedpe")
   
   # remove self-promoters if specified
@@ -132,7 +132,7 @@ dnase_bigwig <- deframe(select(e2g_meta_samples, `Biosample term name`, dnase_bi
 # create interaction tracks for all ENCODE-rE2G samples to show
 e2g_genes <- c("CPEB4", "C5orf47", "NSG2")
 e2g_tracks <- mapply(FUN = make_e2g_track, file = e2g_bedpe, name = names(e2g_bedpe),
-                     MoreArgs = list(gene = e2g_genes))
+                     MoreArgs = list(gene = e2g_genes, plot.outside = snakemake@params$plot_outside))
 ```
 
 ```{r makeDNaseTracks}
@@ -158,7 +158,7 @@ dnase_tracks <- lapply(downloaded_files, FUN = DataTrack, genome = "hg38", type 
 ```
 
 ```{r makeLocusPlot, fig.height=6, fig.width=9}
-# create list of e2g and DNase tracks
+# create list of E2G and DNase-seq tracks
 cell_type_order <- c("hematopoietic multipotent progenitor cell", "K562", "activated T-cell", 
                      "B cell", "common myeloid progenitor, CD34-positive", "mesenteric fat pad")
 pred_tracks <- unlist(Map(list, e2g_tracks[cell_type_order], dnase_tracks[cell_type_order]))

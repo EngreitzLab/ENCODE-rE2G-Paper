@@ -118,7 +118,7 @@ merged_top_assays <- filter(merged, pred_uid %in% perf_top_assays$pred_uid)
 # compute bootstrapped performance for top10 models
 merged_top_assays_bs <- convertMergedForBootstrap(merged_top_assays, pred_config = pred_config)
 bs_perf_top_assays <- bootstrapPerformanceIntervals(merged_top_assays_bs, metric = "auprc",
-                                                      R = snakemake@params$bootstrap_iterations)
+                                                    R = snakemake@params$bootstrap_iterations)
 
 # add long predictor names and rank 
 bs_perf_top_assays <- perf_enh_act_bigwig_assays %>% 

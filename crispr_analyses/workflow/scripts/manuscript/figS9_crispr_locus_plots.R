@@ -201,7 +201,7 @@ make_locus_plot(gene = "HBE1", downstream = 75000, upstream = 75000, e2g_file = 
                 gene_annot = genes, dnase_bam = dnase_bam, h3k27ac_bam = h3k27ac_bam)
 dev.off()
 
-# message("Making plot for MYC locus...")
+message("Making plot for MYC locus...")
 pdf(snakemake@output$myc, height = 6.5, width = 21)
 make_locus_plot(gene = "MYC", downstream = 2100000, upstream = 100000, e2g_file = k562_e2g,
                 e2g_ext_file = k562_e2g_ext, crispr_pairs = crispr_pairs, dhs = dhs,

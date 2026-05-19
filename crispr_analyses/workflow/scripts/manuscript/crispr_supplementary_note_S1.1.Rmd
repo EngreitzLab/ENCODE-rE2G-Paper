@@ -22,7 +22,7 @@ Create plots for CRISPR data supplementary note.
 
 ***
 
-## Panel B,C: Power analysis results
+## Panel b,c: Power analysis results
 
 ```{r}
 # load CRISPR data
@@ -114,7 +114,7 @@ power_schrai_plot <- plot_grid(p2, p1, ncol = 2, rel_widths = c(0.33, 0.66))
 
 ***
 
-## Panel D: Number of genes and elements screened in combined CRISPR data
+## Panel d: Number of genes and elements screened in combined CRISPR data
 
 ```{r}
 # load combined K562 CRISPR training dataset
@@ -182,7 +182,7 @@ n_crispr_pairs <- plot_grid(p1, p2, ncol = 2, rel_widths = c(1, 0.65))
 
 ***
 
-## Panel E: CRISPR E-G pair properties
+## Panel e: CRISPR E-G pair properties
 
 ```{r}
 # select enhancer activity measurements to plot and convert to long format
@@ -244,7 +244,7 @@ eg_properties <- plot_grid(enh_activity_plot, distance_plot, rel_widths = c(2, 0
 
 ***
 
-## Detected effect sizes
+## Panel f: Detected effect sizes
 
 ```{r}
 # function to plot the CRISPR effect sizes vs. distance to TSS

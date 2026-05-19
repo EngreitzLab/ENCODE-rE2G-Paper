@@ -49,7 +49,8 @@ rule main_crispr_benchmarks:
     bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
-    mem = "16G"
+    mem = "16G",
+    runtime = "3h"
   script:
     "../scripts/manuscript/main_crispr_benchmarks.Rmd"
     
@@ -80,7 +81,7 @@ rule main_fig4e_gwas_locus:
   params:
     seed = config["seed"],
     scratch_dir = config["scratch_dir"],
-    filter_links_locus = True
+    plot_outside = True
   conda: "../envs/analyses_env.yml"
   resources:
     mem = "32G"  
@@ -165,7 +166,8 @@ rule extended_data_fig2_crispr_benchmarking:
     bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
-    mem = "16G"
+    mem = "16G",
+    runtime = "3h"
   script:
     "../scripts/manuscript/extended_data_fig2_crispr_benchmarking.Rmd"
 
@@ -262,6 +264,24 @@ rule indirect_crispr_effects_analyses:
   script:
     "../scripts/manuscript/indirect_crispr_effects_analyses.Rmd"
     
+# make additional GWAS locus plots for supplementary figures 
+rule figS6_additional_gwas_loci:
+  input:
+    e2g_metadata = "resources/encode_re2g_metadata.tsv",
+    genome_annot = "resources/gencode.v29.annotation.gtf.gz"
+  output: 
+    rs4927708 = "results/manuscript/plots/figS6_gwas_locus_plots/rs4927708_locus_plot.pdf",
+    rs218265  = "results/manuscript/plots/figS6_gwas_locus_plots/rs218265_locus_plot.pdf",
+    rs7599488 = "results/manuscript/plots/figS6_gwas_locus_plots/rs7599488_locus_plot.pdf"
+  params:
+    scratch_dir = config["scratch_dir"],
+    plot_outside = True
+  conda: "../envs/analyses_env.yml"
+  resources:
+    mem = "16G"
+  script:
+    "../scripts/manuscript/figS6_additional_gwas_loci.R"  
+    
 # perform additional CRISPR benchmarks shown in Fig S8    
 rule figS7_additional_crispr_benchmarks:
   input:
@@ -279,7 +299,8 @@ rule figS7_additional_crispr_benchmarks:
     bootstrap_iterations = 10000
   conda: "../envs/analyses_env.yml"
   resources:
-    mem = "16G"
+    mem = "16G",
+    runtime = "6h"
   script:
     "../scripts/manuscript/figS7_additional_crispr_benchmarks.Rmd"
 

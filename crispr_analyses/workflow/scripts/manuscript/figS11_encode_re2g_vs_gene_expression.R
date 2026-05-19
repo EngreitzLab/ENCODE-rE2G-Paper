@@ -61,7 +61,7 @@ plot_e2g_metric_vs_expr <- function(metric, e2g_metrics, metric_key) {
   }
   
   # make plot for given metric
-  ggplot(e2g_metrics, aes(x = !!sym(metric), y = Gasperini_CPM)) +
+  plot <- ggplot(e2g_metrics, aes(x = !!sym(metric), y = Gasperini_CPM)) +
     geom_point(color = "#730c0d", shape = 16, size = 1, alpha = 0.2) +
     labs(x = metric_key[metric], y = "TPM of target gene") +
     ylim(c(0, 100)) + xlim(c(x_min, x_max)) +
@@ -70,7 +70,9 @@ plot_e2g_metric_vs_expr <- function(metric, e2g_metrics, metric_key) {
              method = "spearman", size = 3, label.x.npc = "left", label.y.npc = "top", vjust = 1) +
     theme_classic() + theme(aspect.ratio = 1, axis.text = element_text(size = 7, color = "#000000"),
                             axis.title = element_text(size = 9, color = "#000000"),
-                            axis.ticks = element_line(color = "#000000"), legend.position = "none") 
+                            axis.ticks = element_line(color = "#000000"), legend.position = "none")
+  
+  return(plot)
   
 }
 

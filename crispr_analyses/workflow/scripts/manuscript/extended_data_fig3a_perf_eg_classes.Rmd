@@ -309,7 +309,7 @@ plot_grid(
 )
 
 # save plot to pdf
-ggsave(filename = "results/manuscript/plots/extended_data_figure3a_crispr_perf_eg_classes.pdf",
+ggsave(filename = "results/manuscript/plots/extended_data_fig3a_crispr_perf_eg_classes.pdf",
        height = 4.5, width = 18)
 ```
 

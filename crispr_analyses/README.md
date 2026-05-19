@@ -58,7 +58,7 @@ comparisons by requesting the main output file. These follow the pattern:
 
 For example:
 ```sh
-# execute full workflow to generate all output files (-n = dryrun, remove to execute workflow)
+# execute workflow to generate specific output files (-n = dryrun, remove to execute workflow)
 snakemake --use-conda --profile <cluster_profile> --configfile ../CRISPR_comparison_resources/crispr_benchmarks_manuscript.yml results/MainPredictors/MainPredictors_crispr_comparison.html -j2 -n
 ```
 
@@ -71,5 +71,5 @@ minutes).
 
 ```sh
 # execute full workflow to generate all analysis results (-n = dryrun, remove to execute workflow)
-snakemake --use-conda --profile <cluster_profile> -j30 -n
+snakemake --use-conda --profile <cluster_profile> -j40 -n
 ```

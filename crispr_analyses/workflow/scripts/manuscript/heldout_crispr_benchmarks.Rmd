@@ -119,7 +119,7 @@ weighted_precision_heldout <- bootstrapPerformanceIntervals(merged_heldout_bs,
                                                             thresholds = thresholds,
                                                             weighted = TRUE, R = boot_iter)
 
-# compute weighted Reacll at threshold including confidence intervals
+# compute weighted recall at threshold including confidence intervals
 weighted_recall_training <- bootstrapPerformanceIntervals(merged_training_bs,
                                                           metric = "recall",
                                                           thresholds = thresholds,

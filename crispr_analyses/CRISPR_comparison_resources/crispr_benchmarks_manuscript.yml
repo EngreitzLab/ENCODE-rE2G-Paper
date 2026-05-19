@@ -3,7 +3,7 @@ comparisons:
     pred:
       ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
       ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
@@ -28,7 +28,7 @@ comparisons:
     pred:
       ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
       ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
@@ -53,7 +53,7 @@ comparisons:
     pred:
       ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
       ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
@@ -78,7 +78,7 @@ comparisons:
     pred:
       ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
       ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
@@ -119,6 +119,12 @@ comparisons:
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00477.bed.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00439.bed.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00760.bed.gz"]
+      EPIraction:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Digestive_Colon_Carcinoma_HCT116_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Pluripotent_iPSCs_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Lymphoid_GM12878_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Leukemia_Jurkat_predictions.tsv.gz"]
       correlation_k562_dnase:
         ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
@@ -134,6 +140,7 @@ comparisons:
       ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
       ENCODE_rE2G: "../CRISPR_comparison_resources/cell_type_mappings/ENCODE-rE2G_cell_type_mapping.txt"
       EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
       correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
     dist_bins_kb: [0, 10, 100, 1500]
     expressed_genes: "../CRISPR_comparison_resources/expressed_genes_all_cell_types.tsv"
@@ -157,6 +164,12 @@ comparisons:
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00477.bed.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00439.bed.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00760.bed.gz"]
+      EPIraction:
+        ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Digestive_Colon_Carcinoma_HCT116_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Pluripotent_iPSCs_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Lymphoid_GM12878_predictions.tsv.gz",
+         "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Leukemia_Jurkat_predictions.tsv.gz"]
       correlation_k562_dnase:
         ["/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_K562_ENCSR000EOT_full_predictions.tsv.gz",
          "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Correlation/correlation_HCT116_ENCSR000ENM_full_predictions.tsv.gz",
@@ -172,6 +185,7 @@ comparisons:
       ABCdnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
       ENCODE_rE2G: "../CRISPR_comparison_resources/cell_type_mappings/ENCODE-rE2G_cell_type_mapping.txt"
       EpiMap: "../CRISPR_comparison_resources/cell_type_mappings/EpiMap_cell_type_mapping.txt"
+      EPIraction: "../CRISPR_comparison_resources/cell_type_mappings/EPIraction_cell_type_mapping.txt"
       correlation_k562_dnase: "../CRISPR_comparison_resources/cell_type_mappings/ABCdnase_cell_type_mapping.txt"
     dist_bins_kb: [0, 10, 100, 1500]
     expressed_genes: "../CRISPR_comparison_resources/expressed_genes_all_cell_types.tsv"
@@ -179,7 +193,7 @@ comparisons:
     pred:
       ABCfull: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dnase_h3k27ac_intactHiC/K562/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
       ABCdnase: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ABC/dhs_only/K562_ENCSR000EOT/Predictions/EnhancerPredictionsAllPutative.tsv.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"
@@ -204,7 +218,7 @@ comparisons:
     pred:
       ENCODE_rE2Gext: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/ENCODE-rE2G/additional_models/formatted/Extended/K562/encode_re2g_extended_K562_LOCOCV_crispr_predictions.tsv.gz"
       ABCnasser2021: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/PublishedPredictors/ABC_Nasser_et_al_2021/K562-Roadmap/EnhancerPredictionsAllPutative.GRCh38.txt.gz"
-      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/prediction_files/predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
+      EPIraction: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EPIraction/EPIraction_August2025/processed/full_predictions/EPIraction_Blood_Myeloid_K562_predictions.tsv.gz"
       EnformerCRISPR: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/Enformer/processed/Enformer_EnsembleData_predictions.tsv.gz"
       EpiMap: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/EpiMap/processed/linking_collated_BSS00762.bed.gz"
       GraphReg_score: "/oak/stanford/groups/engreitz/Projects/Benchmarking/Revisions/Predictors/GraphReg/processed/genome_wide/EG_preds_K562_hg38_GraphReg_FDR_1_L_8_full_predictions.tsv.gz"

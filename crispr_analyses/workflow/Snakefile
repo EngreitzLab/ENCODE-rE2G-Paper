@@ -41,7 +41,9 @@ rule all:
     "results/manuscript/tables/table_s10_performance_summary.csv",
     "results/manuscript/tables/table_s15_enhancer_activity_files.csv",
     "results/manuscript/tables/table_s16_encode_re2g_stats_per_experiment.csv",
-    "results/manuscript/tables/table_s17_encode_re2g_stats_per_gene.csv"
+    "results/manuscript/tables/table_s17_encode_re2g_stats_per_gene.csv",
+    expand("results/manuscript/plots/figS6_gwas_locus_plots/{snp}_locus_plot.pdf",
+           snp = ["rs4927708", "rs218265", "rs7599488"])
 
 rule download_genome_annotation:
   output: "resources/gencode.v29.annotation.gtf.gz"
