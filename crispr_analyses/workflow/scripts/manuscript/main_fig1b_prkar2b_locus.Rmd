@@ -144,8 +144,7 @@ Create tracks for K562 from ENCODE-rE2G models, CRISPR data and chromatin assays
 genes_track <- GeneRegionTrack(genes, genome = "hg38", name = "Genes",
                                transcriptAnnotation = "symbol", color = "#676767", fill = "#676767")
 
-# create chromosome ideogram and axis track
-chr_track <- IdeogramTrack(genome = "hg38", chromosome = locus$chr)
+# create genome axis track
 axis_track <- GenomeAxisTrack()
 ```
 
@@ -252,12 +251,12 @@ for (i in key_cell_types) {
 Plot detailed tracks for K562 and related cell types.
 ```{r detailedLocusPlot, fig.height=6, fig.width=10}
 # combine all tracks into one list
-detailed_tracks <- c(chr_track, axis_track, genes_track, k562_e2g_track, k562_e2g_ext_track,
+detailed_tracks <- c(axis_track, genes_track, k562_e2g_track, k562_e2g_ext_track,
                 crispr_pos_track, crispr_elements_track, k562_h3k27ac_track, k562_dnase_track,
                 k562_dhs_track, key_ct_tracks)
 
 # relative heights for all tracks
-detailed_track_sizes <- c(0.5, 0.6, 0.3, 0.5, 0.5, 0.5, 0.15, 0.6, 0.6, 0.15,
+detailed_track_sizes <- c(0.6, 0.3, 0.5, 0.5, 0.5, 0.15, 0.6, 0.6, 0.15,
                           rep(c(0.3, 0.4), length(key_ct_tracks) / 2))
 
 # arrange locus plot
@@ -269,7 +268,7 @@ plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus
 
 ```{r savePlot1}
 # save locus plot to output .pdf file
-pdf("results/manuscript/plots/main_fig1b_prkar2b_detailed_view.pdf", height = 6, width = 10)
+pdf("results/manuscript/plots/main_fig1b_prkar2b_detailed_view.pdf", height = 5.5, width = 10)
 plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), sizes = detailed_track_sizes,
            background.title = "transparent", col.axis = "black", fontcolor.title = "black",
@@ -467,7 +466,7 @@ dev.off()
 ```
 
 ```{r plotDefaultDNaseExperimets, fig.height=4.5, fig.width=10}
-# create data tracks for ENCODE-E2G predictions in all samples
+# create data tracks for ENCODE-E2G predictions in default samples
 e2g_score_tracks_default <- lapply(pred_scores_default[cluster_order_default],
                                    FUN = create_DataTrack, name = "e2g", genome = "hg38",
                                    gradient = c("#ffc2c2", "#ad2424"),
@@ -507,7 +506,7 @@ plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), f
 ```
 
 ```{r savePlot4}
-# save locus plot to output .pdf file
+# save full locus plot figure using default sample tracks to output .pdf file
 pdf("results/manuscript/plots/main_fig1b_prkar2b_full_view.pdf", height = 10, width = 10)
 plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), from = start(locus),
            to = end(locus), sizes = track_sizes_full, background.title = "transparent",

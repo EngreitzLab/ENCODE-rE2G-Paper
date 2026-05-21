@@ -54,9 +54,6 @@ make_feature_locus_plot <- function(features, links, gene_annot, gene, feature_c
   prom_feature_tracks <- lapply(prom_feat_cols, FUN = create_prom_feature_track, features = features,
                                 feat_config = feat_config)
   
-  # make chromosome picture track
-  ideoTrack <- IdeogramTrack(genome = "hg38", chromosome = as.character(seqnames(tss)))
-  
   # make genome coordinates track
   gtrack <- GenomeAxisTrack(genome = "hg38", chromosome = as.character(seqnames(tss)))
   
@@ -68,7 +65,7 @@ make_feature_locus_plot <- function(features, links, gene_annot, gene, feature_c
   # Assemble plot ----------------------------------------------------------------------------------
   
   # all tracks to plot
-  all_tracks <- c(ideoTrack, gtrack, geneTrack, links_track, score_tracks, element_track,
+  all_tracks <- c(gtrack, geneTrack, links_track, score_tracks, element_track,
                   prom_feature_tracks, enh_feature_tracks)
   
   # set common display parameters across all tracks
@@ -80,7 +77,7 @@ make_feature_locus_plot <- function(features, links, gene_annot, gene, feature_c
     })
   
   # set track heights
-  track_heights <- c(0.5, 0.5, 0.5, 0.5, rep(0.5, length(score_tracks)), 0.15,
+  track_heights <- c(0.5, 0.5, 0.5, rep(0.5, length(score_tracks)), 0.15,
                      rep(0.5, length(prom_feature_tracks)),
                      rep(0.5, length(enh_feature_tracks)))
   
@@ -169,66 +166,13 @@ genes <- genes %>%
          exon = exon_id, transcript = transcript_id, symbol = gene_name) %>% 
   makeGRangesFromDataFrame(keep.extra.columns = TRUE)
 
-# # Re-compute num*EnhGene features ------------------------------------------------------------------
-# 
-# # function to compute the number of features between enhancers and TSSs
-# compute_num_features <- function(pairs, feature) {
-#   
-#   # get upper and lower window for each pair
-#   pairs <- pairs %>% 
-#     mutate(pair_id = paste0(name, ";", TargetGene)) %>% 
-#     mutate(lower = if_else(start < TargetGeneTSS, true = start, false = TargetGeneTSS),
-#            upper = if_else(start < TargetGeneTSS, true = TargetGeneTSS, false = end))
-#   
-#   # create GRanges object with window for each pair
-#   pair_ranges <- pairs %>% 
-#     select(chr, start = lower, end = upper, pair_id) %>% 
-#     makeGRangesFromDataFrame(., keep.extra.columns = TRUE)
-#   
-#   # overlap with features
-#   overlaps <- countOverlaps(query = pair_ranges, subject = feature) - 1
-#   
-#   return(overlaps)
-#   
-# }
-# 
-# # selected gene locus
-# gene <- "PRKAR2B"
-# 
-# # extract features for selected gene and sort according to element coordinates
-# e2g_feat <- e2g_feat %>% 
-#   filter(TargetGene == !!gene) %>% 
-#   arrange(start, end)
-# 
-# # get TSS coordinates for all genes
-# tss <- annot[annot$type == "gene" & annot$gene_type %in% c("protein_coding", "lincRNA")]
-# tss <- split(tss, f = tss$gene_name)
-# tss <- unlist(resize(tss, width = 1, fix = "start"))
-# 
-# # add gencode TSS coordinates to features
-# tss <- tibble(chr = as.character(seqnames(tss)), TargetGeneTSS = start(tss), TargetGene = tss$gene_name)
-# e2g_feat <- e2g_feat %>% 
-#   select(-TargetGeneTSS) %>% 
-#   left_join(tss, by = c("chr", "TargetGene")) %>% 
-#   relocate(TargetGeneTSS, .after = "TargetGene") %>% 
-#   arrange(start, end)
-# 
-# # compute number of candidates between enhancers and TSS
-# candidates <- distinct(select(e2g_feat, chr, start, end))
-# candidates <- makeGRangesFromDataFrame(candidates)
-# e2g_feat$numCandidateEnhGene.Feature <- compute_num_features(e2g_feat, feature = candidates)
-# 
-# # compute the number of TSSs between enhancers and TSS
-# tss <- makeGRangesFromDataFrame(tss, start.field = "TargetGeneTSS", end.field = "TargetGeneTSS")
-# e2g_feat$numTSSEnhGene.Feature <- compute_num_features(e2g_feat, feature = tss)
-
 # Make locus plot ----------------------------------------------------------------------------------
 
 # selected gene locus
 gene <- "PRKAR2B"
 
 # make locus plot
-pdf("results/manuscript/plots/main_fig5a_prkar2b_features.pdf", height = 6, width = 10)
+pdf("results/manuscript/plots/main_fig5a_prkar2b_features.pdf", height = 5.5, width = 10)
 make_feature_locus_plot(e2g_feat, links = e2g_links, gene_annot = genes, gene = gene,
                         feature_config = feat_config, link_col = link_col, upstream = 2e+05,
                         downstream = 2e+05)
