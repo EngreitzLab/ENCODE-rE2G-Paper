@@ -23,6 +23,7 @@ rule all:
     "results/manuscript/extended_data_fig2_crispr_benchmarking.html",
     "results/manuscript/extended_data_fig3a_perf_eg_classes.html",
     "results/manuscript/extended_data_fig3_additional_models.html",
+    "results/manuscript/plots/extended_data_fig6_property_plots.pdf",
     "results/manuscript/plots/extended_data_fig6i_activity_vs_distance.pdf",
     "results/manuscript/plots/extended_data_fig7_enhancer_definitions.pdf",
     "results/manuscript/crispr_supplementary_note_S1.1.html",

@@ -227,10 +227,21 @@ perf_dist_plots +
         plot.title = element_text(size = 12))
 ```
 
-```{r savePrefVsDistPlotToFile}
+```{r savePrefVsDistToFile}
 # save plot to pdf
 ggsave(filename = "results/manuscript/plots/main_fig2c_crispr_performance_distance.pdf", height = 4,
        width = 6)
+
+# reformat performance table for supplementary table
+perf_dist <- perf_dist %>% 
+  left_join(select(pred_config, pred_uid, pred_name_long), by = c("id" = "pred_uid")) %>% 
+  select(-c(subset_col, id)) %>% 
+  dplyr::rename(distance_bin = subset, crispr_positives = pos, crispr_negatives = neg,
+                predictor = pred_name_long) %>% 
+  relocate(predictor, .before = metric)
+
+# save performance table to file
+write_tsv(perf_dist, file = "results/manuscript/tables/main_fig2_perf_vs_distance.tsv")
 ```
 
 ***

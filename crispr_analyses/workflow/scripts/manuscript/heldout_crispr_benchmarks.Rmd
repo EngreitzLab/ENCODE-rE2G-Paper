@@ -155,6 +155,18 @@ weighted_precision <- left_join(weighted_precision, pred_names_ordered, by = "id
 weighted_recall <- left_join(weighted_recall, pred_names_ordered, by = "id")
 ```
 
+```{r}
+# combine all weighted performance metrics into one table for supplementary table
+weighted_perf <- bind_rows(weighted_auprc, weighted_precision, weighted_recall) %>% 
+  mutate(metric = paste("weighted", metric, sep = "_")) %>% 
+  select(-id) %>% 
+  rename(predictor = pred_name_long) %>% 
+  relocate(predictor, .before = metric)
+
+# save performance table to file
+write_tsv(weighted_perf, file = "results/manuscript/tables/crispr_heldout_performance.tsv")
+```
+
 ***
 
 ## Main figure panel

@@ -215,6 +215,28 @@ rule extended_data_fig6i_activity_vs_distance:
     runtime = "6h"
   script:
     "../scripts/manuscript/extended_data_fig6i_activity_vs_distance.R"
+    
+# calculate properties for extended data figure 6
+rule compute_encode_re2g_properties:
+  input: config["encode_re2g_predictions"]["thresholded"].values()
+  output: "results/encode_re2g_properties.rds"
+  conda: "../envs/analyses_env.yml"
+  resources:
+    mem = "48G",
+    runtime = "1h"
+  script:
+    "../scripts/manuscript/compute_encode_re2g_properties.R"
+
+# plot properties distributions for extended data figure 6
+rule extended_data_fig6_property_plots:
+  input: "results/encode_re2g_properties.rds"
+  output: "results/manuscript/plots/extended_data_fig6_property_plots.pdf"
+  conda: "../envs/analyses_env.yml"
+  resources:
+    mem = "48G",
+    runtime = "1h"
+  script:
+    "../scripts/manuscript/extended_data_fig6_property_plots.R"
 
 # create extended data figure 7 showing comparison to other enhancer definitions
 rule extended_data_fig7_enhancer_definitions:
