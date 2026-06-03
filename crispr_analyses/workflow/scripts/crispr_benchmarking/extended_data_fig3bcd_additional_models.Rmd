@@ -9,12 +9,15 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal

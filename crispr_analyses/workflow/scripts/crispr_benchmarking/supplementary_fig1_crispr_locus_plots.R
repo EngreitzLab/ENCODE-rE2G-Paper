@@ -1,4 +1,4 @@
-## Make locus plots for supplementary figures
+## Make locus plots for Supplementary Figure 1
 
 # attach required packages
 suppressPackageStartupMessages({

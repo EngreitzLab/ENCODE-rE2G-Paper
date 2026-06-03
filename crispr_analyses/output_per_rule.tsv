@@ -1,0 +1,29 @@
+Analysis	Figure/table	Snakemake rule
+crispr	Fig 2b-c	fig2bc_main_crispr_benchmarks
+crispr	Fig 2d	heldout_crispr_benchmarks
+crispr	Fig 4d	assaying_enhancer_activity
+crispr	Fig 4f,g	main_fig4fg_additional_models
+crispr	Extended Data Fig 2	extended_data_fig2_crispr_benchmarking
+crispr	Extended Data Fig 3a	extended_data_fig3a_perf_eg_classes
+crispr	Extended Data Fig 3b-d	extended_data_fig3bcd_additional_models
+crispr	Extended Data Fig 3e-g	heldout_crispr_benchmarks
+crispr	Extended Data Fig 7	extended_data_fig7_enhancer_definitions
+crispr	Supplementary Fig N1.1b-f	supplementary_note_N1_crispr_datasets
+crispr	Supplementary Fig N1.2b	indirect_crispr_effects_analyses
+crispr	Supplementary Fig 1	supplementary_fig1_crispr_locus_plots
+crispr	Supplementary Fig 2	supplementary_fig2_crispr_benchmarks
+crispr	Supplementary Fig 3	supplementary_fig3_predictors_vs_crispr_effects
+crispr	Supplementary Table 3	supplementary_table3_crispr_performance_summary
+crispr	Supplementary Table 17	supplementary_table17_enhancer_activity_files
+other	Fig 1b	fig1b_prkar2b_locus
+other	Fig 3e	fig3e_gwas_locus
+other	Fig 4a	fig4a_feature_locus_plot
+other	Extended Data Fig 1	extended_data_fig1_feature_correlation
+other	Extended Data Fig 6a-c	extended_data_fig6abc_property_plots
+other	Supplementary Fig N5.2	supplementary_figN5_additional_gwas_loci
+other	Supplementary Fig 4	supplementary_fig4_encode_re2g_vs_gene_expression
+other	Supplementary Fig 5a	supplementary_fig5a_activity_vs_distance
+other	Supplementary Table 2	supplementary_table2_encode_re2g_metadata
+other	Supplementary Table 8	supplementary_table8_encode_re2g_stats_per_biosample
+other	Supplementary Table 9	supplementary_table9_encode_re2g_stats_per_gene
+other	Supplementary Table 16	supplementary_table16_baseline_predictors

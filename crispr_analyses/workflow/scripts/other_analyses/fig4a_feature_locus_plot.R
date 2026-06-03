@@ -172,7 +172,7 @@ genes <- genes %>%
 gene <- "PRKAR2B"
 
 # make locus plot
-pdf("results/manuscript/plots/main_fig5a_prkar2b_features.pdf", height = 5.5, width = 10)
+pdf(snakemake@output[[1]], height = 5.5, width = 10)
 make_feature_locus_plot(e2g_feat, links = e2g_links, gene_annot = genes, gene = gene,
                         feature_config = feat_config, link_col = link_col, upstream = 2e+05,
                         downstream = 2e+05)

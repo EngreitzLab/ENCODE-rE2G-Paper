@@ -9,12 +9,16 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -494,7 +498,7 @@ pearson_cor <- merged_plot %>%
   mutate(pred_name_long = fct_reorder(pred_name_long, cor_coeff, .desc = TRUE))
 
 # save correlations with CRISPR effect sizes to table
-write_tsv(pearson_cor, file = "results/manuscript/tables/extended_data_fig2_crispr_correlation.tsv")
+write_tsv(pearson_cor, file = "results/manuscript/tables/extended_data_fig2f_crispr_correlation.tsv")
 ```
 
 ```{r}

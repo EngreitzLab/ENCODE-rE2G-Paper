@@ -1,4 +1,4 @@
-## Perform analyses for revised manuscript (revision round 1)
+## Perform CRISPR-related analyses for ENCODE-rE2G manuscript
 
 configfile: "config/config.yml"
 
@@ -7,45 +7,48 @@ configfile: "config/encode_re2g_predictions.yml"
 configfile: "config/encode_re2g_enhancer_lists.yml"
 
 # include rules for all analyses
-include: "rules/manuscript.smk"
-include: "rules/enhancer_definitions.smk"
+include: "rules/crispr_benchmarking.smk"
+include: "rules/other_analyses.smk"
+include: "rules/enhancer_definitions.smk"  # helper functions for analysis in Extended Data Fig. 7
 
+# rule to produce all workflow output for the manuscript
 rule all:
   input:
-    "results/manuscript/main_fig1b_prkar2b_locus.html",
-    "results/manuscript/main_crispr_benchmarks.html",
+    "results/manuscript/fig1b_prkar2b_locus.html",
+    "results/manuscript/fig2bc_main_crispr_benchmarks.html",
     "results/manuscript/heldout_crispr_benchmarks.html",
-    "results/manuscript/main_fig4e_gwas_locus.html",
-    "results/manuscript/plots/main_fig5a_prkar2b_features.pdf",
-    "results/manuscript/assaying_enhancer_activity_figures.html",
-    "results/manuscript/main_fig5_additional_models.html",
+    "results/manuscript/fig3e_gwas_locus.html",
+    "results/manuscript/plots/fig4a_prkar2b_features.pdf",
+    "results/manuscript/assaying_enhancer_activity.html",
+    "results/manuscript/fig4fg_additional_models.html",
     "results/manuscript/extended_data_fig1_feature_correlation.html",
     "results/manuscript/extended_data_fig2_crispr_benchmarking.html",
     "results/manuscript/extended_data_fig3a_perf_eg_classes.html",
-    "results/manuscript/extended_data_fig3_additional_models.html",
-    "results/manuscript/plots/extended_data_fig6_property_plots.pdf",
-    "results/manuscript/plots/extended_data_fig6i_activity_vs_distance.pdf",
+    "results/manuscript/extended_data_fig3bcd_additional_models.html",
+    "results/manuscript/plots/extended_data_fig6abc_property_plots.pdf",
     "results/manuscript/plots/extended_data_fig7_enhancer_definitions.pdf",
-    "results/manuscript/crispr_supplementary_note_S1.1.html",
+    "results/manuscript/supplementary_note_N1_crispr_datasets.html",
     "results/manuscript/indirect_effects_analyses.html",
-    "results/manuscript/figS7_additional_crispr_benchmarks.html",
-    "results/manuscript/figS8_predictors_vs_crispr_effects.html",
-    "results/manuscript/plots/figS9_crispr_locus_plots/hbe1_locus_plot.pdf",
-    "results/manuscript/plots/figS9_crispr_locus_plots/myc_locus_plot.pdf",
-    "results/manuscript/plots/figS9_crispr_locus_plots/myc_locus_plot_zoomed.pdf",
-    "results/manuscript/plots/figS9_crispr_locus_plots/gata1_locus_plot.pdf",
-    "results/manuscript/plots/figS11_encode_re2g_vs_gene_expression.pdf",
-    "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions.csv",
-    "results/manuscript/tables/table_s2_metadata_encode_re2g_ext_predictions.csv",
-    "results/manuscript/tables/table_s2_metadata_encode_re2g_predictions_combined.csv",
-    "results/manuscript/tables/table_s9_baseline_predictors.csv",
-    "results/manuscript/tables/table_s10_performance_summary.csv",
-    "results/manuscript/tables/table_s15_enhancer_activity_files.csv",
-    "results/manuscript/tables/table_s16_encode_re2g_stats_per_experiment.csv",
-    "results/manuscript/tables/table_s17_encode_re2g_stats_per_gene.csv",
-    expand("results/manuscript/plots/figS6_gwas_locus_plots/{snp}_locus_plot.pdf",
-           snp = ["rs4927708", "rs218265", "rs7599488"])
+    expand("results/manuscript/plots/supplementary_figN5.2_gwas_locus_plots/{snp}_locus_plot.pdf",
+       snp = ["rs4927708", "rs218265", "rs7599488"]),
+    expand("results/manuscript/plots/supplementary_fig1_crispr_locus_plots/{gene}_locus_plot.pdf",
+       gene = ["hbe1", "myc", "gata1"]),
+    "results/manuscript/plots/supplementary_fig1_crispr_locus_plots/myc_locus_plot_zoomed.pdf",
+    "results/manuscript/supplementary_fig2_crispr_benchmarks.html",
+    "results/manuscript/supplementary_fig3_predictors_vs_crispr_effects.html",
+    "results/manuscript/plots/supplementary_fig4_encode_re2g_vs_gene_expression.pdf",
+    "results/manuscript/plots/supplementary_fig5a_activity_vs_distance.pdf",
+    "results/manuscript/tables/supplementary_table2_encode_re2g_metadata_combined.csv",
+    "results/manuscript/tables/supplementary_table3_crispr_performance_summary.csv",
+    "results/manuscript/tables/supplementary_table8_encode_re2g_stats_per_biosample.csv",
+    "results/manuscript/tables/supplementary_table9_encode_re2g_stats_per_gene.csv",    
+    "results/manuscript/tables/supplementary_table16_baseline_predictors.csv",
+    "results/manuscript/tables/supplementary_table17_enhancer_activity_files.csv"
 
+
+# Helper rules to download various required inputs -------------------------------------------------
+
+# download GENCODE v29 genome annotations used in analyses
 rule download_genome_annotation:
   output: "resources/gencode.v29.annotation.gtf.gz"
   params:
@@ -53,7 +56,8 @@ rule download_genome_annotation:
   conda: "envs/analyses_env.yml"
   shell:
     "wget -O {output} {params.url}"
-    
+
+# download .bed file (peak) from the ENCODE portal
 rule download_encode_file:
   output: "resources/{accession}.bed.gz"
   params:
@@ -62,6 +66,7 @@ rule download_encode_file:
   shell:
     "wget -O {output} {params.url}"
     
+# download .bigWig (assay signal) from the ENCODE portal    
 rule download_encode_bigwig:
   output: "resources/{accession}.bigWig"
   params:
@@ -69,7 +74,8 @@ rule download_encode_bigwig:
   conda: "envs/analyses_env.yml"
   shell:
     "wget -O {output} {params.url}"  
-    
+
+# download .bam (aligned reads) from the ENCODE portal    
 rule download_encode_bam:
   output:
     bam = temp(config["scratch_dir"] + "/{accession}.bam"),

@@ -9,7 +9,7 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
@@ -18,6 +18,10 @@ set.seed(snakemake@params$seed)
 
 # number for iterations (resamplings) for bootstrapping analyses
 boot_iter <- snakemake@params$bootstrap_iterations
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -186,7 +190,7 @@ ggplot(filter(weighted_auprc, dataset == "Held-out"),
         legend.position = "none")
 
 # save plot to pdf
-ggsave("results/manuscript/plots/main_fig2d_crispr_performance_heldout.pdf", height = 5.75,
+ggsave("results/manuscript/plots/fig2d_crispr_performance_heldout.pdf", height = 5.75,
        width = 4)
 ```
 
@@ -272,7 +276,7 @@ datatable(delta_recall_heldout)
 # combine all significance test on held-out data into one table and save to output .tsv file
 delta_perf_heldout <- bind_rows(delta_auprc_heldout, delta_precision_heldout, delta_recall_heldout)
 write_tsv(delta_perf_heldout,
-          file = "results/manuscript/tables/crispr_heldout_pairwise_comparisons.tsv")
+          file = "results/manuscript/tables/crispr_heldout_pairwise_performance_comparisons.tsv")
 ```
 
 ***
@@ -447,7 +451,7 @@ plot_grid(
 )
 
 # save plot to pdf
-ggsave("results/manuscript/plots/extended_data_fig3g_all_crispr_performance_heldout.pdf",
+ggsave("results/manuscript/plots/extended_data_fig3g_crispr_performance_training_vs_heldout.pdf",
        height = 4, width = 15)
 ```
 
@@ -483,8 +487,9 @@ datatable(delta_recall)
 ```{r}
 # combine all significance test on held-out data into one table and save to output .tsv file
 delta_perf_training_vs_heldout <- bind_rows(delta_auprc, delta_precision, delta_recall)
-write_tsv(delta_perf_training_vs_heldout,
-          file = "results/manuscript/tables/crispr_training_vs_heldout_comparisons.tsv")
+write_tsv(
+  delta_perf_training_vs_heldout,
+  file = "results/manuscript/tables/crispr_training_vs_heldout_pairwise_performance_comparisons.tsv")
 ```
 
 ***

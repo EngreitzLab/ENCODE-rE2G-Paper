@@ -15,6 +15,9 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectory if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -315,6 +318,7 @@ performance <- plot_grid(p1, p2, rel_widths = c(1, 1))
 
 ## Assemble CRISPR supplementary figure 1
 ```{r, fig.height=8, fig.width=15}
+# assemble figure
 plot_grid(
   plot_grid(prcs_all_datasets, labels = "a", label_size = 17),
   plot_grid(auprc_pairs, performance, labels = c("b", "c"), label_size = 17, rel_widths = c(0.8, 1)),
@@ -322,7 +326,8 @@ plot_grid(
   scale = 0.95
   )
 
-ggsave(filename = "results/manuscript/plots/figS7_additional_crispr_benchmarks.pdf", height = 8,
+# save assembled figure to output file
+ggsave(filename = "results/manuscript/plots/supplementary_fig2_crispr_benchmarks.pdf", height = 8,
        width = 15)
 ```
 

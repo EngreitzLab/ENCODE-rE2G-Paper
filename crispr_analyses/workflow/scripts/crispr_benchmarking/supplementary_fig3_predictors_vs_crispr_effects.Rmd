@@ -1,5 +1,5 @@
 ---
-title: "Supplementary Figure 9: Predictor scores vs. CRISPR effect size"
+title: "Supplementary Figure 3: Predictor scores vs. CRISPR effect size"
 author: "Andreas R. Gschwind"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: 
@@ -15,6 +15,9 @@ knitr::opts_chunk$set(echo = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectory if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -182,8 +185,8 @@ plot_grid(
   )
 
 # save to pdf
-ggsave(filename = "results/manuscript/plots/figS8_predictors_vs_crispr_effects_rasterized.pdf",
-       height = 14, width = 10)
+outfile <- "results/manuscript/plots/supplementary_fig3_predictors_vs_crispr_effects_rasterized.pdf"
+ggsave(filename = outfile, height = 14, width = 10)
 ```
 
 ***

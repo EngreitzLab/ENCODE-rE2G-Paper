@@ -3,29 +3,45 @@ This snakemake workflow performs CRISPR benchmarking and other related analyses 
 ENCODE-rE2G ENCODE companion paper. Most analyses depend on running the CRISPR benchmarking pipeline 
 (see below).
 
-The workflow performs analyses shown in the following figures, tables and supplementary notes:
-- Fig 1b
-- Fig 2b-d
-- Fig 4e
-- Fig 5a, d, f, g
-- Extended Data Fig 1
-- Extended Data Fig 2
-- Extended Data Fig 3
-- Extended Data Fig 6i
-- Extended Data Fig 7
-- Fig Note S1.1b-f
-- Fig Note S1.2b
-- Fig S7
-- Fig S8
-- Fig S9
-- Fig S10
-- Fig S11
-- Table S2
-- Table S9
-- Table S10
-- Table S15
-- Table S16
-- Table S17
+The workflow performs CRISPR benchmarking analyses shown in the following figures, tables and
+supplementary notes:
+
+| Figure/table | Snakemake rule |
+| --- | --- |
+| Fig 2b-c | `fig2bc_main_crispr_benchmarks` |
+| Fig 2d | `heldout_crispr_benchmarks` |
+| Fig 4d | `assaying_enhancer_activity` |
+| Fig 4f,g | `main_fig4fg_additional_models` |
+| Extended Data Fig 2 | `extended_data_fig2_crispr_benchmarking` |
+| Extended Data Fig 3a | `extended_data_fig3a_perf_eg_classes` |
+| Extended Data Fig 3b-d | `extended_data_fig3bcd_additional_models` |
+| Extended Data Fig 3e-g | `heldout_crispr_benchmarks` |
+| Extended Data Fig 7 | `extended_data_fig7_enhancer_definitions` |
+| Supplementary Fig N1.1b-f | `supplementary_note_N1_crispr_datasets` |
+| Supplementary Fig N1.2b | `indirect_crispr_effects_analyses` |
+| Supplementary Fig 1 | `supplementary_fig1_crispr_locus_plots` |
+| Supplementary Fig 2 | `supplementary_fig2_crispr_benchmarks` |
+| Supplementary Fig 3 | `supplementary_fig3_predictors_vs_crispr_effects` |
+| Supplementary Table 3 | `supplementary_table3_crispr_performance_summary` |
+| Supplementary Table 17 | `supplementary_table17_enhancer_activity_files` |
+
+Furthermore, several additional CRISPR benchmarking unrelated figures and tables are created by this
+workflow:
+
+| Figure/table | Snakemake rule |
+| --- | --- |
+| Fig 1b | `fig1b_prkar2b_locus` |
+| Fig 3e | `fig3e_gwas_locus` |
+| Fig 4a | `fig4a_feature_locus_plot` |
+| Extended Data Fig 1 | `extended_data_fig1_feature_correlation` |
+| Extended Data Fig 6a-c | `extended_data_fig6abc_property_plots` |
+| Supplementary Fig N5.2 | `supplementary_figN5_additional_gwas_loci` |
+| Supplementary Fig 4 | `supplementary_fig4_encode_re2g_vs_gene_expression` |
+| Supplementary Fig 5a | `supplementary_fig5a_activity_vs_distance` |
+| Supplementary Table 2 | `supplementary_table2_encode_re2g_metadata` |
+| Supplementary Table 8 | `supplementary_table8_encode_re2g_stats_per_biosample` |
+| Supplementary Table 9 | `supplementary_table9_encode_re2g_stats_per_gene` |
+| Supplementary Table 16 | `supplementary_table16_baseline_predictors` |
 
 ## Running the CRISPR benchmarking pipeline
 The `CRISPR_comparison` subdirectory contains a copy of the
@@ -72,4 +88,13 @@ minutes).
 ```sh
 # execute full workflow to generate all analysis results (-n = dryrun, remove to execute workflow)
 snakemake --use-conda --profile <cluster_profile> -j40 -n
+```
+
+Similarly to the CRISPR benchmarking pipeline, individual workflow steps can be executed to produce
+specific outputs. These can be either specified by output file name, or the rule producing the
+desired output (from the tables above):
+
+```sh
+# example executing one rule to generate specific output (-n = dryrun, remove to execute workflow)
+snakemake --use-conda --profile <cluster_profile> fig2bc_main_crispr_benchmarks -j1 -n
 ```

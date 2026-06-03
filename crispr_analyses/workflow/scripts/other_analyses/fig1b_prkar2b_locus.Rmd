@@ -9,12 +9,16 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
 knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots/fig1b", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -268,7 +272,7 @@ plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus
 
 ```{r savePlot1}
 # save locus plot to output .pdf file
-pdf("results/manuscript/plots/main_fig1b_prkar2b_detailed_view.pdf", height = 5.5, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_prkar2b_detailed_view.pdf", height = 5.5, width = 10)
 plotTracks(trackList = detailed_tracks, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), sizes = detailed_track_sizes,
            background.title = "transparent", col.axis = "black", fontcolor.title = "black",
@@ -394,7 +398,7 @@ cluster_order <- cluster_scores$labels[cluster_scores$order]
 
 # make dendrogram and save to pdf to add to figure in illustrator
 dendro <- as.dendrogram(cluster_scores)
-pdf("results/manuscript/plots/main_fig1b_e2g_dendrogram_allExperiments.pdf", height = 3, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_e2g_dendrogram_allExperiments.pdf", height = 3, width = 10)
 plot(dendro)
 dev.off()
 ```
@@ -408,7 +412,7 @@ cluster_order_default <- cluster_scores_default$labels[cluster_scores_default$or
 
 # make dendrogram and save to pdf to add to figure in illustrator
 dendro_default <- as.dendrogram(cluster_scores_default)
-pdf("results/manuscript/plots/main_fig1b_e2g_dendrogram_defaultExperiments.pdf", height = 3,
+pdf("results/manuscript/plots/fig1b/fig1b_e2g_dendrogram_defaultExperiments.pdf", height = 3,
     width = 10)
 plot(dendro_default)
 dev.off()
@@ -457,7 +461,7 @@ plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locu
 
 ```{r savePlot2}
 # save locus plot to output .pdf file
-pdf("results/manuscript/plots/main_fig1b_prkar2b_allExperiments.pdf", height = 4.5, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_prkar2b_allExperiments.pdf", height = 4.5, width = 10)
 plotTracks(trackList = e2g_score_tracks, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), background.title = "transparent",
            col.axis = "black", fontcolor.title = "black", fontface.title = 1,
@@ -483,7 +487,7 @@ plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqna
 
 ```{r savePlot3}
 # save locus plot to output .pdf file
-pdf("results/manuscript/plots/main_fig1b_prkar2b_defaultExperiments.pdf", height = 4.5, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_prkar2b_defaultExperiments.pdf", height = 4.5, width = 10)
 plotTracks(trackList = e2g_score_tracks_default, chromosome = as.character(seqnames(locus)),
            from = start(locus), to = end(locus), background.title = "transparent",
            col.axis = "black", fontcolor.title = "black", fontface.title = 1,
@@ -507,7 +511,7 @@ plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), f
 
 ```{r savePlot4}
 # save full locus plot figure using default sample tracks to output .pdf file
-pdf("results/manuscript/plots/main_fig1b_prkar2b_full_view.pdf", height = 10, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_prkar2b_full_view.pdf", height = 10, width = 10)
 plotTracks(trackList = all_tracks, chromosome = as.character(seqnames(locus)), from = start(locus),
            to = end(locus), sizes = track_sizes_full, background.title = "transparent",
            col.axis = "black", fontcolor.title = "black", fontface.title = 1,
@@ -517,7 +521,7 @@ dev.off()
 
 ```{r}
 # plot one track to extract score gradient legend for illustrator
-pdf("results/manuscript/plots/main_fig1b_e2g_legend.pdf", height = 5, width = 10)
+pdf("results/manuscript/plots/fig1b/fig1b_e2g_legend.pdf", height = 5, width = 10)
 plotTracks(e2g_score_tracks[[1]], chromosome = as.character(seqnames(locus)), from = start(locus),
            to = end(locus), background.title = "transparent", col.axis = "black",
            fontcolor.title = "black", fontface.title = 1)

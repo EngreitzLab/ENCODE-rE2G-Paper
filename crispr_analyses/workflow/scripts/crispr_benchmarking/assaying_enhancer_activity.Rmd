@@ -9,12 +9,16 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 
 # set random seed
 set.seed(snakemake@params$seed)
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -152,7 +156,8 @@ p1 <- ggplot(perf_enh_act_bigwig_assays, aes(x = rank, y = AUPRC)) +
 # create pretty names for top models including assay name and performance rank
 bs_perf_top_assays <- bs_perf_top_assays %>%
   mutate(pred_name_long = sub(" \\(ENCFF.+", "", pred_name_long)) %>% 
-  mutate(pred_name_long = paste0(pred_name_long, " (", rank, ".)"))
+  mutate(pred_name_long = paste0(pred_name_long, " (", rank, ".)")) %>% 
+  arrange(rank)
 
 # only plot top assay models
 p2 <- ggplot(bs_perf_top_assays, aes(y = fct_reorder(pred_name_long, .x = full), x = full, fill = Type)) +
@@ -171,10 +176,10 @@ p2 <- ggplot(bs_perf_top_assays, aes(y = fct_reorder(pred_name_long, .x = full),
 plot_grid(p1, p2, nrow = 1, rel_widths = c(0.75, 1))
 
 # save plot to pdf
-ggsave(filename = "results/manuscript/plots/main_fig5d_enh_activity.pdf", height = 3.5, width = 5.5)
+ggsave(filename = "results/manuscript/plots/fig4d_enhancer_activity.pdf", height = 3.5, width = 5.5)
 
 # save top 10 assay performance to file for use in other analyses
-write_tsv(bs_perf_top_assays, file = "results/manuscript/tables/enh_activity_top_assays.tsv")
+write_tsv(bs_perf_top_assays, file = "results/manuscript/tables/fig4d_performance_top_assays.tsv")
 ```
 
 ## Figure for supplementary note
@@ -245,7 +250,8 @@ p2 <- ggplot(bs_perf_hist, aes(y = fct_reorder(pred_name_long, .x = full), x = f
 plot_grid(p1, p2, rel_widths = c(1, 0.7), scale = c(1, 0.8), labels = c("a", "b"))
 
 # save plot to .pdf for manuscript
-ggsave(filename = "results/manuscript/plots/figS10_enhancer_activity.pdf", height = 4, width = 9)
+ggsave(filename = "results/manuscript/plots/supplementary_fig6_enhancer_activity.pdf", height = 4,
+       width = 9)
 ```
 
 ***

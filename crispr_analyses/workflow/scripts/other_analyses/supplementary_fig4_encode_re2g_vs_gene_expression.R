@@ -82,4 +82,4 @@ plots <- lapply(names(metric_key), FUN = plot_e2g_metric_vs_expr, e2g_metrics = 
 
 # arrange panels in one figure and save to output file
 fig <- plot_grid(plotlist = plots, nrow = 2, align = "vertical")
-ggsave2(fig, filename = snakemake@output[[1]], height = 8, width = 10)
+ggsave(fig, filename = snakemake@output[[1]], height = 8, width = 10)

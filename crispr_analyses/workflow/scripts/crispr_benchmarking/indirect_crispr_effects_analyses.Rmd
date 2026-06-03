@@ -15,6 +15,10 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 # suppress dplyrs summarize info
 options(dplyr.summarize.inform = FALSE)
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -271,8 +275,8 @@ ggplot(crispr, aes(x = dist_to_tss / 1e3, y = direct_vs_indirect_negative,
   theme_classic()
 
 # save plot to pdf
-ggsave(file = "results/manuscript/plots/figS1.2b_crispr_direct_effect_probability.pdf", height = 4,
-       width = 6.2)
+ggsave(file = "results/manuscript/plots/supplementary_figN1.2b_crispr_direct_effect_probability.pdf",
+       height = 4, width = 6.2)
 ```
 
 ***

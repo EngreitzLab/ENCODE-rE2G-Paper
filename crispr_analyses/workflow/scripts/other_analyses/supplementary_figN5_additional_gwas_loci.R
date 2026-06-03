@@ -1,4 +1,4 @@
-# Make additional GWAS locus plots for supplementary figures 
+# Make additional GWAS locus plots for Supplementary Figure N5.2
 
 suppressPackageStartupMessages({
   library(tidyverse)

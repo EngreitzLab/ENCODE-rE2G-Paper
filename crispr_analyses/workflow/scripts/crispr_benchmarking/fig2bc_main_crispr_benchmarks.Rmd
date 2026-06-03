@@ -9,7 +9,7 @@ output:
     code_folding: hide
 ---
 
-```{r setupDocument, include=FALSE}
+```{r setup, include=FALSE}
 # set output html chunk options
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 
@@ -18,6 +18,10 @@ set.seed(snakemake@params$seed)
 
 # number for iterations (resamplings) for bootstrapping analyses
 boot_iter <- snakemake@params$bootstrap_iterations
+
+# create output subdirectories if needed
+dir.create("results/manuscript/plots", showWarnings = FALSE, recursive = TRUE)
+dir.create("results/manuscript/tables", showWarnings = FALSE, recursive = TRUE)
 ```
 
 ## Goal
@@ -184,7 +188,7 @@ plot_grid(
 
 ```{r savePRCPlotToFile}
 # save to pdf
-ggsave(filename = "results/manuscript/plots/main_fig2b_crispr_prc.pdf", height = 4.5, width = 12.5)
+ggsave(filename = "results/manuscript/plots/fig2b_crispr_prc.pdf", height = 4.5, width = 12.5)
 ```
 
 ***
@@ -229,7 +233,7 @@ perf_dist_plots +
 
 ```{r savePrefVsDistToFile}
 # save plot to pdf
-ggsave(filename = "results/manuscript/plots/main_fig2c_crispr_performance_distance.pdf", height = 4,
+ggsave(filename = "results/manuscript/plots/fig2c_crispr_performance_distance.pdf", height = 4,
        width = 6)
 
 # reformat performance table for supplementary table
@@ -241,7 +245,7 @@ perf_dist <- perf_dist %>%
   relocate(predictor, .before = metric)
 
 # save performance table to file
-write_tsv(perf_dist, file = "results/manuscript/tables/main_fig2_perf_vs_distance.tsv")
+write_tsv(perf_dist, file = "results/manuscript/tables/fig2c_performance_vs_distance.tsv")
 ```
 
 ***
@@ -263,7 +267,7 @@ pw_delta_auprc <- bootstrapDeltaPerformance(merged_bs, metric = "auprc", R = boo
 plotBootstrappedIntervals(pw_delta_auprc)
 
 # save test results to file
-write_tsv(pw_delta_auprc, file = "results/manuscript/tables/main_fig2_pairwise_auprc_comparisons.tsv")
+write_tsv(pw_delta_auprc, file = "results/manuscript/tables/fig2b_pairwise_auprc_comparisons.tsv")
 ```
 
 ### Pairwise precision at threshold significance tests
@@ -283,7 +287,7 @@ pw_delta_prec <- bootstrapDeltaPerformance(merged_bs, metric = "precision",
 plotBootstrappedIntervals(pw_delta_prec)
 
 # save test results to file
-write_tsv(pw_delta_prec, file = "results/manuscript/tables/main_fig2_pairwise_precision_comparisons.tsv")
+write_tsv(pw_delta_prec, file = "results/manuscript/tables/fig2b_pairwise_precision_comparisons.tsv")
 ```
 
 ***

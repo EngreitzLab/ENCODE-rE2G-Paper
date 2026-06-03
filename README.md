@@ -22,8 +22,8 @@ The following subdirectories contain code used to perform analyses shown in the 
 
 ### crispr_analyses:
 Snakemake workflow for CRISPR benchmarking and other related analyses results shown in Main
-Figures 1, 2, 4 and 5, Extended Data Figures 1, 2, 3, 7, Supplementary Figures S1.1, S1.2, S7, S8,
-S9, S10, as well as Supplementary Tables S2, S9, S10, S14, S15, S16.
+Figures 1b; 2b-d; 3e and 4a,d,f,g; Extended Data Figures 1, 2, 3, 6a-c, 7, Supplementary Figures
+N1.1b-f, N1.2b, N5.2, 1, 2, 3, 4, 5a, as well as Supplementary Tables 2, 3, 8, 9, 16, 17.
 
 ### gwas_analyses:
 Code used to compute GWAS metrics shown in analyses of the manuscript. GWAS benchmarks were
@@ -37,7 +37,6 @@ ENCODE-rE2G predictions for 1,458 human DNase-seq experiments.
 This subdirectory contains code used in other analyses across the manuscript, including annotating
 CRISPR data with chromatin categories, analyzing enhancer synergy and analyses related to 3D
 contact, enhancer-gene correlation and promoter classes.
-
 
 ## Benchmarking pipelines
 Following pipelines were used to benchmark enhancer-gene predictions against CRISPR, eQTL and GWAS
