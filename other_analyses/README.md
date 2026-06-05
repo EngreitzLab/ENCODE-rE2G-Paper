@@ -16,3 +16,5 @@ Fig. 6 and the "few vs. many enhancers" analysis in Extended Data Fig. 6e
 predictors shown in Supplementary Figure 5
 - `supplementary_figN3.1_ep_correlation` contains code used to perform the enhancer-promoter
 correlation analyses presented in Supplementary FigN3.1 (Supplementary Note 3).
+- `cartoons_fig1a` contains helper scripts used to simulate and plot Hi-C and eQTL data for
+illustrations in Fig. 1a.
